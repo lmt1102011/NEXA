@@ -7,9 +7,9 @@ import { useDirectoryStore } from '@/stores/directory'
 
 const APP_ID = 'nexa-dir-v2'
 const DIRECTORY_ROOM = 'public-rooms'
-const ANNOUNCE_MS = 20_000
-const PRUNE_MS = 8_000
-const STALE_MS = 60_000
+const ANNOUNCE_MS = 10_000
+const PRUNE_MS = 5_000
+const STALE_MS = 30_000
 
 interface DirectoryMessage {
   deviceId: string
@@ -44,10 +44,11 @@ function deviceId(): string {
 
 /**
  * Serverless public-room directory. Every NEXA install joins a single shared
- * Trystero room and broadcasts the public rooms it is hosting a few times per
- * minute. Listeners merge those announcements into a transient store, so the
- * "Active Public Rooms" lists on Home and Rooms pages show live rooms from
- * every device — not just whatever this browser happens to know about.
+ * Trystero room and broadcasts the public rooms it is hosting — immediately
+ * whenever its own roster changes and periodically as a heartbeat. Listeners
+ * merge those announcements into a transient store, so the "Active Public
+ * Rooms" lists on Home and Rooms pages show live rooms from every device
+ * without waiting for a slow polling interval.
  */
 export function startPublicRoomsDirectory() {
   if (started || typeof window === 'undefined') return
@@ -94,6 +95,21 @@ export function startPublicRoomsDirectory() {
       .catch(() => {})
   }
 
+  const myPublicKey = () =>
+    useRoomsStore
+      .getState()
+      .rooms.filter(
+        (room) =>
+          room.visibility === 'public' &&
+          room.status === 'live' &&
+          room.hostId === useSessionStore.getState().userId,
+      )
+      .map((room) => `${room.id}:${room.status}:${room.participantCount}`)
+      .sort()
+      .join('|')
+
+  let lastKey = myPublicKey()
+
   sendRoomEnded = (roomId) => {
     void action
       .send({
@@ -108,6 +124,12 @@ export function startPublicRoomsDirectory() {
   const prune = () => useDirectoryStore.getState().pruneRooms(Date.now() - STALE_MS)
 
   announce()
+  useRoomsStore.subscribe(() => {
+    const key = myPublicKey()
+    if (key === lastKey) return
+    lastKey = key
+    announce()
+  })
   window.setInterval(announce, ANNOUNCE_MS)
   window.setInterval(prune, PRUNE_MS)
 }
