@@ -89,8 +89,9 @@ export class MediaEngine {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1280, max: 1600 },
+          height: { ideal: 720, max: 900 },
+          frameRate: { ideal: 30, max: 30 },
           facingMode: 'user',
           ...(this.preferredVideoId ? { deviceId: { exact: this.preferredVideoId } } : {}),
         },

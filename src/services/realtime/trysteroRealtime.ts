@@ -1,4 +1,4 @@
-import { joinRoom, type DataPayload, type MessageAction, type Room } from 'trystero'
+import { joinRoom, type DataPayload, type MessageAction, type Room, type TurnServerConfig } from 'trystero'
 import type { ID, Participant } from '@/types'
 import type {
   RealtimeService,
@@ -9,6 +9,25 @@ import type {
 } from './types'
 
 const APP_ID = 'nexa-call-v2'
+
+/**
+ * ICE servers: Google STUN for direct peer-to-peer plus a free TURN relay
+ * (openrelay.metered.ca) so calls still connect behind strict/symmetric NAT
+ * and CGNAT where STUN alone cannot form a path.
+ */
+const ICE_SERVERS: TurnServerConfig[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: ['stun:openrelay.metered.ca:80'] },
+  {
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turn:openrelay.metered.ca:443?transport=tcp',
+    ],
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+]
 
 const EVENT_TYPES = [
   'peer-hello',
@@ -68,7 +87,7 @@ export class TrysteroRealtimeService implements RealtimeService {
     this.announced = false
 
     const room = joinRoom(
-      { appId: APP_ID, trickleIce: true },
+      { appId: APP_ID, trickleIce: true, turnConfig: ICE_SERVERS },
       roomId,
       { onJoinError: () => {} },
     )
@@ -130,6 +149,37 @@ export class TrysteroRealtimeService implements RealtimeService {
     this.sentStream = stream
     if (stream) {
       for (const promise of this.room.addStream(stream)) promise.catch(() => {})
+    }
+  }
+
+  /**
+   * Caps the outbound camera bitrate on every live peer connection. WebRTC's
+   * built-in congestion control still applies, but a lower ceiling keeps calls
+   * smooth (less buffering/loss) when the network is weak. Passing `null`
+   * removes the cap. Camera-only senders are left untouched.
+   */
+  setVideoMaxBitrate(kbps: number | null) {
+    if (!this.room) return
+    for (const pc of Object.values(this.room.getPeers())) {
+      for (const sender of pc.getSenders()) {
+        if (sender.track?.kind !== 'video' || sender.track.muted) continue
+        const params = sender.getParameters()
+        const encodings = params.encodings?.map((enc) => ({
+          ...enc,
+          maxBitrate: kbps === null ? 8_000_000 : kbps * 1000,
+        }))
+        if (!encodings) continue
+        const next: RTCRtpSendParameters = {
+          ...params,
+          encodings,
+          degradationPreference: 'maintain-framerate',
+        }
+        try {
+          void sender.setParameters(next).catch(() => undefined)
+        } catch {
+          // parameters may be mid-negotiation; the next stats tick re-applies
+        }
+      }
     }
   }
 

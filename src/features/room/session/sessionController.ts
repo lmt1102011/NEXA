@@ -14,6 +14,21 @@ import { toast } from '@/stores/ui'
 const STATS_INTERVAL_MS = 3000
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
+/**
+ * Outbound video bitrate ceiling (kbps) per connection quality. WebRTC keeps
+ * its own congestion control; these caps just prevent the encoder from
+ * flooding a weak uplink, which keeps calls smooth instead of buffering.
+ */
+const VIDEO_CAP_KBPS: Record<'poor' | 'fair' | 'good' | 'excellent', number | null> = {
+  poor: 280,
+  fair: 560,
+  good: 1100,
+  excellent: null,
+}
+const LOW_BANDWIDTH_CAP_KBPS = 240
+
+let videoCap: number | null = null
+
 let realtime: RealtimeService | null = null
 let offRealtime: (() => void) | null = null
 let offRemoteStream: (() => void) | null = null
@@ -87,6 +102,7 @@ function cleanupTransport() {
   offRemoteStream?.()
   offRemoteStream = null
   stopStatsMonitor()
+  videoCap = null
   realtime?.dispose()
   realtime = null
 }
@@ -137,13 +153,41 @@ function pushOutgoingStream() {
   realtime?.sendStream(stream)
 }
 
+function adaptVideoCap() {
+  const call = useCallStore.getState()
+  const quality = qualityController.getStats().quality
+  const base = call.lowBandwidth ? LOW_BANDWIDTH_CAP_KBPS : VIDEO_CAP_KBPS[quality]
+  const current = videoCap
+  let next: number | null
+
+  if (base === null) {
+    // excellent: ramp back up steadily, then remove the cap entirely
+    next = current === null || current >= 1500 ? null : Math.round(current * 1.35)
+  } else if (current === null || base < current) {
+    // degrade drops immediately so the call stays smooth
+    next = base
+  } else if (base === 1100 && current >= 1100) {
+    next = current
+  } else {
+    // recovered quality: raise in gentle steps to avoid oscillation
+    next = Math.min(base, Math.round(current * 1.35))
+  }
+
+  if (next === current) return
+  videoCap = next
+  realtime?.setVideoMaxBitrate(videoCap)
+}
+
 function startStatsMonitor() {
   if (statsTimer !== null) return
   statsTimer = window.setInterval(() => {
     void (async () => {
       try {
         const sample = await realtime?.measureStats()
-        if (sample) qualityController.report(sample)
+        if (sample) {
+          qualityController.report(sample)
+          adaptVideoCap()
+        }
       } catch {
         // measurement is best-effort
       }

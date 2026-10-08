@@ -35,6 +35,7 @@ export interface RealtimeService {
   announce: () => void
   updateSelf: (self: Participant) => void
   sendStream: (stream: MediaStream | null) => void
+  setVideoMaxBitrate: (kbps: number | null) => void
   measureStats: () => Promise<StatsSample | null>
   disconnect: () => void
   emit: (event: RoomEvent) => void
