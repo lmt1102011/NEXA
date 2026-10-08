@@ -77,6 +77,16 @@ export interface Room {
 
 export type ParticipantRole = 'host' | 'guest'
 
+/**
+ * Extra rights the host can grant to a single participant (e.g. a co-host).
+ * The host always has every right; guests start with none.
+ */
+export interface ParticipantPermissions {
+  canShareScreen?: boolean
+  canModerate?: boolean
+  canManageRoom?: boolean
+}
+
 export interface Participant {
   id: ID
   name: string
@@ -90,6 +100,7 @@ export interface Participant {
   quality: ConnectionQuality
   joinedAt: number
   peerId?: string
+  permissions?: ParticipantPermissions
 }
 
 export interface JoinRequest {

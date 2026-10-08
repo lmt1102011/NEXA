@@ -31,7 +31,7 @@ export function VideoTile({
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
   const isSelf = participant.isSelf
   const self = useRoomSessionStore((state) => state.self)
-  const isHost = self?.role === 'host'
+  const canModerateSelf = self?.role === 'host' || Boolean(self?.permissions?.canModerate)
   const hasLocalVideo = useCallStore((state) => state.hasLocalVideo)
   const remoteStream = useCallStore((state) =>
     !isSelf && participant.peerId ? state.remoteStreams[participant.peerId] : undefined,
@@ -152,7 +152,7 @@ export function VideoTile({
         {participant.role === 'host' ? <Crown className="h-3.5 w-3.5 shrink-0 text-warning" /> : null}
       </div>
 
-      {!compact && !participant.isSelf && isHost ? (
+      {!compact && !participant.isSelf && canModerateSelf && participant.role !== 'host' ? (
         <div className="absolute right-2 top-2 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -191,7 +191,7 @@ export function VideoTile({
         <div
           className={
             'absolute top-2 rounded-md bg-black/45 px-1.5 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-sm ' +
-            (isHost ? 'right-10' : 'right-2')
+            (canModerateSelf && !participant.isSelf ? 'right-10' : 'right-2')
           }
         >
           {participant.quality}

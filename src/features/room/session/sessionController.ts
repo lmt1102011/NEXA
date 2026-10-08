@@ -1,4 +1,4 @@
-import type { ID, JoinRequest, NoiseFilter, Participant, ToastInput } from '@/types'
+import type { ID, JoinRequest, NoiseFilter, Participant, ParticipantPermissions, ToastInput } from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
@@ -454,8 +454,10 @@ function handleRealtimeEvent(event: RoomEvent) {
           mediaEngine.setCamera(patch.cameraOn)
         }
         const promoted = patch.role === 'host' && state.self.role !== 'host'
+        const grantedPermissions = patch.permissions !== undefined && !state.self.permissions
         state.setSelf({ ...state.self, ...patch, isSelf: true })
         if (promoted) notify({ title: 'You are now the host of this room', variant: 'success' })
+        if (grantedPermissions) notify({ title: 'The host granted you new permissions', variant: 'success', duration: 4000 })
         break
       }
       touchParticipant(event.participantId)
@@ -802,7 +804,7 @@ export async function toggleScreenShare() {
     notify({ title: 'Screen sharing is disabled by the host', variant: 'warning' })
     return
   }
-  if (self.role !== 'host' && !room.settings.screenShare.allowParticipants) {
+  if (self.role !== 'host' && !self.permissions?.canShareScreen && !room.settings.screenShare.allowParticipants) {
     notify({ title: 'Only the host can share their screen', variant: 'warning' })
     return
   }
@@ -867,39 +869,62 @@ export function applyLocalAudioPreferences(prefs: { noiseFilter: NoiseFilter; ec
 
 export function applyHostSettings(patch: RoomSettingsPatch) {
   const state = store()
-  if (state.self?.role !== 'host') return
+  const self = state.self
+  if (!self || (self.role !== 'host' && !self.permissions?.canManageRoom)) return
   state.applySettingsPatch(patch)
   realtime?.emit({ type: 'settings', patch })
 }
 
-export function hostMuteParticipant(participantId: ID) {
+/**
+ * Grants (or clears, with an empty object) a set of rights for one participant.
+ * Only the host can do this; the grant is broadcast so every device — including
+ * the recipient — picks it up through the regular `peer-update` self handler.
+ */
+export function grantParticipantPermissions(participantId: ID, permissions: ParticipantPermissions) {
   const state = store()
   if (state.self?.role !== 'host') return
+  const target = state.participants.find((participant) => participant.id === participantId)
+  if (!target || target.id === state.self.id || target.role === 'host') return
+  state.updateParticipant(participantId, { permissions })
+  realtime?.emit({ type: 'peer-update', participantId, patch: { permissions } })
+}
+
+/** Host rights: the host always, or a participant granted `canModerate`. */
+function canModerate(): boolean {
+  const self = store().self
+  if (!self) return false
+  return self.role === 'host' || Boolean(self.permissions?.canModerate)
+}
+
+export function hostMuteParticipant(participantId: ID) {
+  const state = store()
+  if (!canModerate()) return
+  const target = state.participants.find((participant) => participant.id === participantId)
+  if (!target || target.role === 'host') return
   state.updateParticipant(participantId, { micOn: false })
   realtime?.emit({ type: 'peer-update', participantId, patch: { micOn: false } })
-  const target = state.participants.find((participant) => participant.id === participantId)
-  if (target) notify({ title: `Muted ${target.name}`, duration: 2200 })
+  notify({ title: `Muted ${target.name}`, duration: 2200 })
 }
 
 export function hostDisableCamera(participantId: ID) {
   const state = store()
-  if (state.self?.role !== 'host') return
+  if (!canModerate()) return
+  const target = state.participants.find((participant) => participant.id === participantId)
+  if (!target || target.role === 'host') return
   state.updateParticipant(participantId, { cameraOn: false })
   realtime?.emit({ type: 'peer-update', participantId, patch: { cameraOn: false } })
-  const target = state.participants.find((participant) => participant.id === participantId)
-  if (target) notify({ title: `Turned off ${target.name}'s camera`, duration: 2200 })
+  notify({ title: `Turned off ${target.name}'s camera`, duration: 2200 })
 }
 
 export function hostRemoveParticipant(participantId: ID) {
   const state = store()
-  if (state.self?.role !== 'host') return
+  if (!canModerate()) return
   const target = state.participants.find((participant) => participant.id === participantId)
+  if (!target || target.role === 'host') return
   state.removeParticipant(participantId)
   realtime?.emit({ type: 'kick', participantId })
-  if (target) {
-    state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} was removed by the host`))
-    notify({ title: `Removed ${target.name}`, duration: 2600 })
-  }
+  state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} was removed by the host`))
+  notify({ title: `Removed ${target.name}`, duration: 2600 })
 }
 
 export function hostTransferHost(participantId: ID) {
@@ -952,8 +977,10 @@ export function hostEndRoom() {
 }
 
 export function hostToggleLock(locked: boolean) {
-  applyHostSettings({ access: { lockRoom: locked } })
   const state = store()
+  const self = state.self
+  if (!self || (self.role !== 'host' && !self.permissions?.canManageRoom)) return
+  applyHostSettings({ access: { lockRoom: locked } })
   if (state.room) {
     state.addMessage(buildSystemMessage(state.room.id, locked ? 'Room was locked' : 'Room was unlocked'))
   }

@@ -55,6 +55,7 @@ export function ActivitiesPanel() {
 
   if (!room) return null
   const isHost = self?.role === 'host'
+  const canManageRoom = isHost || Boolean(self?.permissions?.canManageRoom)
   const link = typeof window !== 'undefined' ? buildInviteLink(room) : ''
 
   return (
@@ -140,7 +141,7 @@ export function ActivitiesPanel() {
       <section>
         <SectionTitle icon={<Palette className="h-3.5 w-3.5" />} title="Room background" />
         <div className="mt-2 rounded-xl border border-line bg-surface-2 p-3">
-          <div className={isHost ? undefined : 'pointer-events-none opacity-60'}>
+          <div className={canManageRoom ? undefined : 'pointer-events-none opacity-60'}>
             <Segmented
               ariaLabel="Room background"
               value={room.settings.appearance.background}
@@ -151,7 +152,7 @@ export function ActivitiesPanel() {
             />
           </div>
           <p className="mt-2 text-[12px] text-ink-subtle">
-            {isHost ? 'Applies to the video stage for everyone.' : 'Only the host can change this.'}
+            {canManageRoom ? 'Applies to the video stage for everyone.' : 'Only the host can change this.'}
           </p>
         </div>
       </section>

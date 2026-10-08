@@ -14,7 +14,30 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useRoomSessionStore } from '@/stores/roomSession'
-import { acceptAllRequests, acceptRequest, hostMuteParticipant, hostRemoveParticipant, hostTransferHost, rejectRequest } from '@/features/room/session/sessionController'
+import {
+  acceptAllRequests,
+  acceptRequest,
+  grantParticipantPermissions,
+  hostMuteParticipant,
+  hostRemoveParticipant,
+  hostTransferHost,
+  rejectRequest,
+} from '@/features/room/session/sessionController'
+import type { ParticipantPermissions } from '@/types'
+
+const COHOST_PERMISSIONS: ParticipantPermissions = {
+  canShareScreen: true,
+  canModerate: true,
+  canManageRoom: true,
+}
+
+function hasPermission(participant: ParticipantPermissions | undefined, key: keyof ParticipantPermissions) {
+  return Boolean(participant?.[key])
+}
+
+function isCoHost(participant: ParticipantPermissions | undefined) {
+  return Boolean(participant && (participant.canShareScreen || participant.canModerate || participant.canManageRoom))
+}
 
 function timeAgo(timestamp: number) {
   const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
@@ -29,6 +52,14 @@ export function ParticipantsPanel() {
   const [query, setQuery] = useState('')
 
   const isHost = self?.role === 'host'
+  const canModerateSelf = isHost || Boolean(self?.permissions?.canModerate)
+
+  function togglePermission(participantId: string, current: ParticipantPermissions | undefined, key: keyof ParticipantPermissions) {
+    const next: ParticipantPermissions = { ...current }
+    if (next[key]) delete next[key]
+    else next[key] = true
+    grantParticipantPermissions(participantId, next)
+  }
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -133,6 +164,7 @@ export function ParticipantsPanel() {
                 </p>
                 <p className="flex items-center gap-1.5 text-[11.5px] text-ink-subtle">
                   {participant.role === 'host' ? 'Host' : 'Guest'}
+                  {participant.role !== 'host' && isCoHost(participant.permissions) ? ' · Co-host' : ''}
                   {participant.quality === 'poor' || participant.quality === 'fair' ? (
                     <span className="inline-flex items-center gap-1 text-warning">
                       · <WifiOff className="h-3 w-3" /> {participant.quality}
@@ -141,7 +173,7 @@ export function ParticipantsPanel() {
                 </p>
               </div>
 
-              {!participant.isSelf && isHost ? (
+              {!participant.isSelf && canModerateSelf && participant.role !== 'host' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -162,6 +194,54 @@ export function ParticipantsPanel() {
                       <ShieldCheck className="h-4 w-4" />
                       Make host
                     </DropdownMenuItem>
+
+                    {isHost ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            grantParticipantPermissions(
+                              participant.id,
+                              isCoHost(participant.permissions) ? {} : COHOST_PERMISSIONS,
+                            )
+                          }
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          {isCoHost(participant.permissions) ? 'Remove co-host' : 'Make co-host'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => togglePermission(participant.id, participant.permissions, 'canShareScreen')}
+                        >
+                          {hasPermission(participant.permissions, 'canShareScreen') ? (
+                            <Check className="h-4 w-4 text-accent" />
+                          ) : (
+                            <span className="h-4 w-4" />
+                          )}
+                          Can share screen
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => togglePermission(participant.id, participant.permissions, 'canModerate')}
+                        >
+                          {hasPermission(participant.permissions, 'canModerate') ? (
+                            <Check className="h-4 w-4 text-accent" />
+                          ) : (
+                            <span className="h-4 w-4" />
+                          )}
+                          Can mute & remove
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => togglePermission(participant.id, participant.permissions, 'canManageRoom')}
+                        >
+                          {hasPermission(participant.permissions, 'canManageRoom') ? (
+                            <Check className="h-4 w-4 text-accent" />
+                          ) : (
+                            <span className="h-4 w-4" />
+                          )}
+                          Can manage room
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+
                     <DropdownMenuSeparator />
                     <DropdownMenuItem destructive onSelect={() => hostRemoveParticipant(participant.id)}>
                       <Trash className="h-4 w-4" />
