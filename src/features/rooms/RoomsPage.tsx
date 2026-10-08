@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Segmented } from '@/components/ui/segmented'
 import { useRoomsStore } from '@/stores/rooms'
+import { usePublicRooms } from '@/features/rooms/usePublicRooms'
 import { RoomCard, RoomCardSkeleton } from '@/features/rooms/RoomCard'
 import type { Room } from '@/types'
 
@@ -18,7 +19,8 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 ]
 
 export default function RoomsPage() {
-  const rooms = useRoomsStore((state) => state.rooms)
+  const localRooms = useRoomsStore((state) => state.rooms)
+  const rooms = usePublicRooms()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('live')
@@ -31,7 +33,7 @@ export default function RoomsPage() {
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    let list = rooms.filter((room) => room.visibility === 'public')
+    let list = rooms
 
     if (normalized) {
       list = list.filter(
@@ -57,13 +59,13 @@ export default function RoomsPage() {
     const normalized = query.trim().toLowerCase()
     if (!normalized) return null
     return (
-      rooms.find(
+      localRooms.find(
         (room) =>
           room.visibility === 'private' &&
           (room.code.toLowerCase() === normalized || room.name.toLowerCase() === normalized),
       ) ?? null
     )
-  }, [rooms, query])
+  }, [localRooms, query])
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">

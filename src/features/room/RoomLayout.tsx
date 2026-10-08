@@ -5,6 +5,7 @@ import { useBreakpoint, useHotkeys } from '@/hooks'
 import { useConnectionMonitor } from '@/hooks/useConnectionMonitor'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useRoomsStore } from '@/stores/rooms'
+import { useDirectoryStore } from '@/stores/directory'
 import { useUiStore } from '@/stores/ui'
 import { roomFromInviteParams } from '@/lib/invite'
 import { initRoom, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
@@ -44,7 +45,8 @@ export default function RoomLayout() {
   useEffect(() => {
     if (roomId && !useRoomsStore.getState().findRoom(roomId)) {
       const invited = roomFromInviteParams(roomId, searchParams)
-      if (invited) useRoomsStore.getState().addRoom(invited)
+      const remote = invited ?? useDirectoryStore.getState().findRoom(roomId)
+      if (remote) useRoomsStore.getState().addRoom(remote)
     }
     return initRoom(roomId)
     // eslint-disable-next-line react-hooks/exhaustive-deps

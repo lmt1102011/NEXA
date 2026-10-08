@@ -5,7 +5,7 @@ import { ArrowRight, Radio, Search, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LiveDot } from '@/components/ui/badge'
-import { useRoomsStore } from '@/stores/rooms'
+import { usePublicRooms } from '@/features/rooms/usePublicRooms'
 import { RoomCard, RoomCardSkeleton } from '@/features/rooms/RoomCard'
 
 const heroMotion = {
@@ -14,7 +14,7 @@ const heroMotion = {
 }
 
 export default function HomePage() {
-  const rooms = useRoomsStore((state) => state.rooms)
+  const rooms = usePublicRooms()
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -24,16 +24,15 @@ export default function HomePage() {
   }, [])
 
   const stats = useMemo(() => {
-    const liveRooms = rooms.filter((room) => room.status === 'live' && room.visibility === 'public')
+    const liveRooms = rooms.filter((room) => room.status === 'live')
     const people = liveRooms.reduce((total, room) => total + room.participantCount, 0)
     return { roomCount: liveRooms.length, people }
   }, [rooms])
 
   const visibleRooms = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    const filtered = rooms.filter((room) => room.visibility === 'public')
-    if (!normalized) return filtered
-    return filtered.filter(
+    if (!normalized) return rooms
+    return rooms.filter(
       (room) =>
         room.name.toLowerCase().includes(normalized) ||
         room.code.toLowerCase().includes(normalized) ||

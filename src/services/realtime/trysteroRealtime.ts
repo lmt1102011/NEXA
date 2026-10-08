@@ -1,4 +1,5 @@
-import { joinRoom, type DataPayload, type MessageAction, type Room, type TurnServerConfig } from 'trystero'
+import { joinRoom, type DataPayload, type MessageAction, type Room } from 'trystero'
+import { ICE_SERVERS } from './iceServers'
 import type { ID, Participant } from '@/types'
 import type {
   RealtimeService,
@@ -9,25 +10,6 @@ import type {
 } from './types'
 
 const APP_ID = 'nexa-call-v2'
-
-/**
- * ICE servers: Google STUN for direct peer-to-peer plus a free TURN relay
- * (openrelay.metered.ca) so calls still connect behind strict/symmetric NAT
- * and CGNAT where STUN alone cannot form a path.
- */
-const ICE_SERVERS: TurnServerConfig[] = [
-  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-  { urls: ['stun:openrelay.metered.ca:80'] },
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-      'turn:openrelay.metered.ca:443?transport=tcp',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-]
 
 const EVENT_TYPES = [
   'peer-hello',
