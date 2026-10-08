@@ -21,8 +21,8 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024
  * someone kills the tab (or their network) without a graceful leave, so no one
  * stays listed in a room they are no longer connected to.
  */
-const PRESENCE_INTERVAL_MS = 5000
-const STALE_EVICT_MS = 20000
+const PRESENCE_INTERVAL_MS = 4000
+const STALE_EVICT_MS = 12000
 
 /**
  * Outbound video bitrate ceiling (kbps) per connection quality. WebRTC keeps
@@ -107,6 +107,8 @@ function connectAsSelf() {
 }
 
 function handlePageHide() {
+  const self = store().self
+  if (self) realtime?.emit({ type: 'peer-leave', participantId: self.id })
   realtime?.disconnect()
 }
 
