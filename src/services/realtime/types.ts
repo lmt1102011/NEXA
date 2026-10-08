@@ -12,6 +12,7 @@ export type RoomEvent =
   | { type: 'request-resolved'; requestId: ID; participantId: ID; accepted: boolean }
   | { type: 'settings'; patch: RoomSettingsPatch }
   | { type: 'kick'; participantId: ID }
+  | { type: 'name-taken'; participantId: ID; name: string }
   | { type: 'end' }
 
 export type RoomEventListener = (event: RoomEvent) => void

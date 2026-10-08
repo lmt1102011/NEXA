@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { applyHostSettings, hostEndRoom, hostToggleLock } from '@/features/room/session/sessionController'
-import type { AudioQuality, VideoQuality } from '@/types'
+import type { AudioQuality, NoiseFilter, VideoQuality } from '@/types'
 
 const VIDEO_OPTIONS: { value: VideoQuality; label: string }[] = [
   { value: 'auto', label: 'Auto' },
@@ -35,6 +35,12 @@ const AUDIO_OPTIONS: { value: AudioQuality; label: string }[] = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
+]
+
+const NOISE_OPTIONS: { value: NoiseFilter; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'light', label: 'Light' },
+  { value: 'strong', label: 'Strong' },
 ]
 
 export default function RoomSettingsOverlay() {
@@ -206,11 +212,16 @@ export default function RoomSettingsOverlay() {
                 className="w-full"
               />
             </Field>
-            <ToggleRow
-              label="Noise suppression"
-              checked={settings.av.noiseSuppression}
-              onCheckedChange={(checked) => applyHostSettings({ av: { noiseSuppression: checked } })}
-            />
+            <Field label="Noise filter">
+              <Segmented
+                ariaLabel="Noise filter"
+                value={settings.av.noiseFilter}
+                onChange={(value) => applyHostSettings({ av: { noiseFilter: value } })}
+                options={NOISE_OPTIONS}
+                size="sm"
+                className="w-full"
+              />
+            </Field>
             <ToggleRow
               label="Echo cancellation"
               checked={settings.av.echoCancellation}

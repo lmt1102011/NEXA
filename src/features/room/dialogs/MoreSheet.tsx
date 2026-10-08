@@ -1,9 +1,11 @@
-import { Keyboard, Link2, LogOut, MessageSquare, Settings, SlidersHorizontal, Users, Wrench } from 'lucide-react'
+import { Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users, Wrench } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
 import { useRoomSessionStore } from '@/stores/roomSession'
+import { useCallStore } from '@/stores/call'
 import { useUiStore } from '@/stores/ui'
+import { toggleScreenShare } from '@/features/room/session/sessionController'
 
 export function MoreSheet() {
   const modal = useUiStore((state) => state.modal)
@@ -11,6 +13,8 @@ export function MoreSheet() {
   const setPanel = useUiStore((state) => state.setPanel)
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen)
   const self = useRoomSessionStore((state) => state.self)
+  const requests = useRoomSessionStore((state) => state.requests.length)
+  const sharing = useCallStore((state) => state.sharing)
   const navigate = useNavigate()
   const { roomId } = useParams()
 
@@ -18,7 +22,19 @@ export function MoreSheet() {
 
   const entries = [
     { icon: <MessageSquare className="h-4.5 w-4.5" />, label: 'Chat', onClick: () => setPanel('chat') },
-    { icon: <Users className="h-4.5 w-4.5" />, label: 'People', onClick: () => setPanel('participants') },
+    {
+      icon: <Users className="h-4.5 w-4.5" />,
+      label: 'People',
+      badge: requests,
+      onClick: () => setPanel('participants'),
+    },
+    {
+      icon: <MonitorUp className="h-4.5 w-4.5" />,
+      label: sharing ? 'Stop sharing' : 'Share screen',
+      tone: 'danger',
+      active: sharing,
+      onClick: () => void toggleScreenShare(),
+    },
     { icon: <Wrench className="h-4.5 w-4.5" />, label: 'Tools', onClick: () => setPanel('tools') },
     { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: 'Devices', onClick: () => setModal('devices') },
     { icon: <Link2 className="h-4.5 w-4.5" />, label: 'Invite', onClick: () => setModal('invite') },
@@ -50,10 +66,31 @@ export function MoreSheet() {
                 close()
               }}
               className={cn(
-                'flex flex-col items-center gap-2 rounded-xl border border-line bg-surface-2 px-2 py-3.5 text-center transition-colors hover:border-line-strong hover:bg-surface-3',
+                'flex flex-col items-center gap-2 rounded-xl border px-2 py-3.5 text-center transition-colors',
+                'active' in entry && entry.active && 'tone' in entry && entry.tone === 'danger'
+                  ? 'border-danger/40 bg-danger-soft text-danger'
+                  : 'active' in entry && entry.active
+                    ? 'border-accent/40 bg-accent-soft text-accent'
+                    : 'border-line bg-surface-2 hover:border-line-strong hover:bg-surface-3',
               )}
             >
-              <span className="text-ink-muted">{entry.icon}</span>
+              <span
+                className={cn(
+                  'relative',
+                  'active' in entry && entry.active && 'tone' in entry && entry.tone === 'danger'
+                    ? 'text-danger'
+                    : 'active' in entry && entry.active
+                      ? 'text-accent'
+                      : 'text-ink-muted',
+                )}
+              >
+                {entry.icon}
+                {'badge' in entry && entry.badge && entry.badge > 0 ? (
+                  <span className="absolute -right-2 -top-1.5 grid min-w-[16px] place-items-center rounded-full bg-accent-solid px-1 font-mono text-[9px] font-semibold leading-4 text-white">
+                    {entry.badge > 9 ? '9+' : entry.badge}
+                  </span>
+                ) : null}
+              </span>
               <span className="text-[11.5px] font-medium text-ink">{entry.label}</span>
             </button>
           ))}

@@ -153,7 +153,8 @@ export function ControlBar() {
       key: 'share',
       icon: <MonitorUp className="h-[18px] w-[18px]" />,
       label: sharing ? 'Stop share' : 'Share',
-      tone: sharing ? 'accent' : 'default',
+      tone: sharing ? 'danger' : 'default',
+      danger: sharing,
       active: sharing,
       shortcut: 'S',
       ariaLabel: sharing ? 'Stop screen sharing' : 'Share your screen',
@@ -226,12 +227,13 @@ export function ControlBar() {
     key: 'more',
     icon: <Ellipsis className="h-[19px] w-[19px]" />,
     label: 'More',
+    badge: requests,
     ariaLabel: 'More options',
     onClick: () => setModal('more'),
   }
 
   if (isMobile) {
-    const mobileKeys = ['mic', 'camera', 'share', 'chat', 'people']
+    const mobileKeys = ['mic', 'camera', 'chat']
     const mobileItems = items.filter((item) => mobileKeys.includes(item.key))
     return (
       <div className="relative z-20 flex shrink-0 items-center gap-1 border-t border-line bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur">
@@ -254,13 +256,19 @@ export function ControlBar() {
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2">
-        {items.map((item) =>
-          item.key.startsWith('divider') ? (
-            <span key={item.key} className="mx-1 h-7 w-px bg-line" aria-hidden />
-          ) : (
+        {items
+          .filter((item) => ['mic', 'camera', 'share'].includes(item.key))
+          .map((item) => (
             <DesktopControl key={item.key} item={item} />
-          ),
-        )}
+          ))}
+        <span className="mx-1 h-7 w-px bg-line" aria-hidden />
+        {items
+          .filter((item) => ['chat', 'people'].includes(item.key))
+          .map((item) => (
+            <DesktopControl key={item.key} item={item} />
+          ))}
+        <span className="mx-1 hidden h-7 w-px bg-line sm:block lg:hidden" aria-hidden />
+        <DesktopControl item={moreItem} />
       </div>
 
       <div className="flex flex-1 justify-end">

@@ -12,11 +12,19 @@ import {
 import { Button } from '@/components/ui/button'
 import { SelectField } from '@/components/ui/select'
 import { ToggleRow } from '@/components/ui/switch'
+import { Segmented } from '@/components/ui/segmented'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
-import { switchDevice } from '@/features/room/session/sessionController'
+import { switchDevice, applyLocalAudioPreferences } from '@/features/room/session/sessionController'
+import type { NoiseFilter } from '@/types'
+
+const NOISE_OPTIONS: { value: NoiseFilter; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'light', label: 'Light' },
+  { value: 'strong', label: 'Strong' },
+]
 
 export function DeviceSettingsDialog() {
   const modal = useUiStore((state) => state.modal)
@@ -33,7 +41,7 @@ export function DeviceSettingsDialog() {
   const micOn = useCallStore((state) => state.micOn)
   const cameraOn = useCallStore((state) => state.cameraOn)
 
-  const [noiseSuppression, setNoiseSuppression] = useState(room?.settings.av.noiseSuppression ?? true)
+  const [noiseFilter, setNoiseFilter] = useState<NoiseFilter>(room?.settings.av.noiseFilter ?? 'light')
   const [echoCancellation, setEchoCancellation] = useState(room?.settings.av.echoCancellation ?? true)
   const [voiceDetected, setVoiceDetected] = useState(false)
 
@@ -41,10 +49,8 @@ export function DeviceSettingsDialog() {
 
   useEffect(() => {
     if (modal !== 'devices') return
-    const off = mediaEngine.onSpeakingChange((speaking) => setVoiceDetected(speaking))
-    mediaEngine.setPreferences({ noiseSuppression, echoCancellation })
-    return off
-  }, [modal, noiseSuppression, echoCancellation])
+    return mediaEngine.onSpeakingChange((speaking) => setVoiceDetected(speaking))
+  }, [modal])
 
   useEffect(() => {
     if (modal !== 'devices') return
@@ -144,18 +150,30 @@ export function DeviceSettingsDialog() {
             />
           </div>
 
-          <div className="divide-y divide-[var(--nx-line)] rounded-xl border border-line bg-surface-2 px-3">
-            <ToggleRow
-              label="Noise suppression"
-              description="Filters background noise from your mic."
-              checked={noiseSuppression}
-              onCheckedChange={setNoiseSuppression}
-            />
+          <div className="space-y-2 divide-y divide-[var(--nx-line)] rounded-xl border border-line bg-surface-2 px-3 py-2">
+            <div className="space-y-1.5">
+              <span className="block pt-1 text-[13px] font-medium text-ink">Noise filter</span>
+              <span className="block text-[12px] text-ink-subtle">Reduces background noise from your mic.</span>
+              <Segmented
+                ariaLabel="Noise filter"
+                value={noiseFilter}
+                onChange={(value) => {
+                  setNoiseFilter(value)
+                  void applyLocalAudioPreferences({ noiseFilter: value, echoCancellation })
+                }}
+                options={NOISE_OPTIONS}
+                size="sm"
+                className="w-full"
+              />
+            </div>
             <ToggleRow
               label="Echo cancellation"
               description="Prevents speaker output from feeding back."
               checked={echoCancellation}
-              onCheckedChange={setEchoCancellation}
+              onCheckedChange={(value) => {
+                setEchoCancellation(value)
+                void applyLocalAudioPreferences({ noiseFilter, echoCancellation: value })
+              }}
             />
           </div>
 

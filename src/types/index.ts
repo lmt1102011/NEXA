@@ -8,6 +8,7 @@ export type RoomVisibility = 'public' | 'private'
 export type RoomStatus = 'live' | 'idle'
 export type VideoQuality = 'auto' | '720p' | '1080p' | '360p' | '180p'
 export type AudioQuality = 'auto' | 'high' | 'medium' | 'low'
+export type NoiseFilter = 'off' | 'light' | 'strong'
 export type ConnectionQuality = 'excellent' | 'good' | 'fair' | 'poor'
 
 export interface RoomSettings {
@@ -32,7 +33,7 @@ export interface RoomSettings {
     videoQuality: VideoQuality
     audioQuality: AudioQuality
     echoCancellation: boolean
-    noiseSuppression: boolean
+    noiseFilter: NoiseFilter
     autoAdjustQuality: boolean
     lowBandwidth: boolean
   }

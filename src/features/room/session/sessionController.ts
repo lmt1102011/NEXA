@@ -1,4 +1,4 @@
-import type { ID, JoinRequest, Participant, ToastInput } from '@/types'
+import type { ID, JoinRequest, NoiseFilter, Participant, ToastInput } from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
@@ -167,10 +167,14 @@ async function refreshDevices() {
 
 async function prepareMedia(audio: boolean, camera: boolean, silent: boolean) {
   const call = useCallStore.getState()
-  mediaEngine.setPreferences({
-    echoCancellation: store().room?.settings.av.echoCancellation ?? true,
-    noiseSuppression: store().room?.settings.av.noiseSuppression ?? true,
-  })
+  if (!mediaEngine.isPrefsLocked()) {
+    const noiseFilter = store().room?.settings.av.noiseFilter ?? 'light'
+    mediaEngine.setPreferences({
+      echoCancellation: store().room?.settings.av.echoCancellation ?? true,
+      noiseSuppression: noiseFilter !== 'off',
+      autoGainControl: noiseFilter !== 'off',
+    })
+  }
 
   if (audio || camera) {
     const result = await mediaEngine.prepare({ audio, video: camera })
@@ -231,6 +235,62 @@ function sanitizeParticipant(participant: Participant): Participant {
   return { ...participant, isSelf: false }
 }
 
+function normalizeName(name: string) {
+  return name.trim().toLowerCase()
+}
+
+/**
+ * Returns the existing room name that clashes with `name`, or null when the
+ * name is free. `excludeParticipantId` lets a participant check against
+ * everyone but themselves (used when renaming).
+ */
+export function nameTakenBy(name: string, excludeParticipantId?: ID): string | null {
+  const s = store()
+  const n = normalizeName(name)
+  if (!n) return null
+  const isHostSelf = !!s.room && !!s.self && s.self.id === s.room.hostId
+  if (s.room && !isHostSelf && normalizeName(s.room.hostName) === n) {
+    return s.room.hostName
+  }
+  for (const p of s.participants) {
+    if (p.id === excludeParticipantId) continue
+    if (normalizeName(p.name) === n) return p.name
+  }
+  return null
+}
+
+function flagNameClash(clashName: string, participantId: ID) {
+  realtime?.emit({ type: 'name-taken', participantId, name: clashName })
+}
+
+/**
+ * Change your display name while inside a room. Rejects (and reports) names
+ * that are already used by someone else in the room.
+ */
+export function renameSelf(name: string): boolean {
+  const s = store()
+  const trimmed = name.trim()
+  if (!trimmed || !s.self) return false
+  const clash = nameTakenBy(trimmed, s.self.id)
+  if (clash) {
+    s.setNameTaken(clash)
+    notify({
+      title: 'Name is already taken',
+      description: `“${clash}” is used by someone else here. Pick a different name.`,
+      variant: 'danger',
+      duration: 5000,
+    })
+    return false
+  }
+  useSessionStore.getState().setName(trimmed)
+  const next: Participant = { ...s.self, name: trimmed }
+  s.setSelf(next)
+  realtime?.updateSelf(next)
+  realtime?.announce()
+  s.setNameTaken(null)
+  return true
+}
+
 function handleRealtimeEvent(event: RoomEvent) {
   const state = store()
   const selfId = state.self?.id
@@ -239,11 +299,19 @@ function handleRealtimeEvent(event: RoomEvent) {
     case 'peer-hello': {
       if (event.participant.id === selfId) return
       state.addParticipant(sanitizeParticipant(event.participant))
+      if (state.self?.role === 'host') {
+        const clash = nameTakenBy(event.participant.name, event.participant.id)
+        if (clash) flagNameClash(clash, event.participant.id)
+      }
       break
     }
     case 'peer-ack': {
       if (event.participant.id === selfId) return
       state.addParticipant(sanitizeParticipant(event.participant))
+      if (state.self?.role === 'host') {
+        const clash = nameTakenBy(event.participant.name, event.participant.id)
+        if (clash) flagNameClash(clash, event.participant.id)
+      }
       break
     }
     case 'peer-update': {
@@ -265,6 +333,10 @@ function handleRealtimeEvent(event: RoomEvent) {
         break
       }
       state.updateParticipant(event.participantId, { ...event.patch, isSelf: false })
+      if (state.self?.role === 'host' && event.patch.name !== undefined) {
+        const clash = nameTakenBy(event.patch.name, event.participantId)
+        if (clash) flagNameClash(clash, event.participantId)
+      }
       break
     }
     case 'peer-leave': {
@@ -280,6 +352,19 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     case 'request': {
       if (state.self?.role !== 'host') return
+      const rosterClash = nameTakenBy(event.request.name, event.request.participantId)
+      const requestClash =
+        store()
+          .requests.find(
+            (r) =>
+              r.participantId !== event.request.participantId &&
+              normalizeName(r.name) === normalizeName(event.request.name),
+          )?.name ?? null
+      const clash = rosterClash ?? requestClash
+      if (clash) {
+        realtime?.emit({ type: 'name-taken', participantId: event.request.participantId, name: clash })
+        return
+      }
       state.addRequest(event.request)
       notify({
         title: `${event.request.name} wants to join`,
@@ -310,6 +395,20 @@ function handleRealtimeEvent(event: RoomEvent) {
         return
       }
       state.removeParticipant(event.participantId)
+      break
+    }
+    case 'name-taken': {
+      if (event.participantId !== selfId) break
+      const self = state.self
+      if (!self || normalizeName(self.name) !== normalizeName(event.name)) break
+      if (state.nameTaken && normalizeName(state.nameTaken) === normalizeName(event.name)) break
+      state.setNameTaken(event.name)
+      notify({
+        title: 'Name is already taken',
+        description: `“${event.name}” belongs to someone else here. Choose another name to join.`,
+        variant: 'danger',
+        duration: 6000,
+      })
       break
     }
     case 'end':
@@ -599,6 +698,27 @@ export async function switchDevice(kind: 'audio' | 'video', deviceId: string) {
   await refreshDevices()
   syncSelf()
   pushOutgoingStream()
+}
+
+export function applyLocalAudioPreferences(prefs: { noiseFilter: NoiseFilter; echoCancellation: boolean }) {
+  mediaEngine.setPreferences(
+    {
+      echoCancellation: prefs.echoCancellation,
+      noiseSuppression: prefs.noiseFilter !== 'off',
+      autoGainControl: prefs.noiseFilter !== 'off',
+    },
+    true,
+  )
+  void (async () => {
+    const status = await mediaEngine.reapplyAudio()
+    const call = useCallStore.getState()
+    call.setPermissions({ audioPermission: status })
+    const granted = status === 'granted'
+    call.setMic(granted && call.micOn)
+    mediaEngine.setMic(granted && call.micOn)
+    syncSelf()
+    pushOutgoingStream()
+  })()
 }
 
 export function applyHostSettings(patch: RoomSettingsPatch) {

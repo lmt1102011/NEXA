@@ -9,13 +9,16 @@ export interface PrepareResult {
 export interface MediaConstraintsPrefs {
   echoCancellation: boolean
   noiseSuppression: boolean
+  autoGainControl: boolean
 }
 
 type StreamListener = () => void
 type SpeakingListener = (speaking: boolean) => void
 
-const SPEAKING_THRESHOLD = 0.045
-const SPEAKING_RELEASE = 0.03
+const SPEAKING_THRESHOLD = 0.03
+const SPEAKING_RELEASE = 0.018
+const SPEAKING_ONSET_FRAMES = 2
+const SPEAKING_OFFSET_FRAMES = 4
 
 /**
  * Owns every local media resource: camera/mic capture, device switching,
@@ -30,7 +33,15 @@ export class MediaEngine {
   private levelBuffer: Uint8Array<ArrayBuffer> | null = null
   private rafId = 0
   private speaking = false
-  private prefs: MediaConstraintsPrefs = { echoCancellation: true, noiseSuppression: true }
+  private smoothedLevel = 0
+  private hotFrames = 0
+  private coldFrames = 0
+  private prefs: MediaConstraintsPrefs = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  }
+  private prefsLocked = false
   private preferredAudioId = ''
   private preferredVideoId = ''
   private streamListeners = new Set<StreamListener>()
@@ -60,6 +71,7 @@ export class MediaEngine {
         audio: {
           echoCancellation: this.prefs.echoCancellation,
           noiseSuppression: this.prefs.noiseSuppression,
+          autoGainControl: this.prefs.autoGainControl,
           ...(this.preferredAudioId ? { deviceId: { exact: this.preferredAudioId } } : {}),
         },
         video: false,
@@ -117,7 +129,11 @@ export class MediaEngine {
 
   setMic(enabled: boolean) {
     for (const track of this.stream?.getAudioTracks() ?? []) track.enabled = enabled
-    if (!enabled && this.speaking) this.updateSpeaking(false)
+    if (!enabled) {
+      this.hotFrames = 0
+      this.coldFrames = 0
+      if (this.speaking) this.updateSpeaking(false)
+    }
   }
 
   setCamera(enabled: boolean) {
@@ -125,8 +141,37 @@ export class MediaEngine {
     this.notifyStream()
   }
 
-  setPreferences(prefs: MediaConstraintsPrefs) {
+  setPreferences(prefs: MediaConstraintsPrefs, lock = false) {
     this.prefs = prefs
+    if (lock) this.prefsLocked = true
+  }
+
+  isPrefsLocked() {
+    return this.prefsLocked
+  }
+
+  /** Re-acquires the microphone so latest preferences take effect immediately. */
+  async reapplyAudio(): Promise<PermissionStatus> {
+    try {
+      const fresh = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: this.prefs.echoCancellation,
+          noiseSuppression: this.prefs.noiseSuppression,
+          autoGainControl: this.prefs.autoGainControl,
+          ...(this.preferredAudioId ? { deviceId: { exact: this.preferredAudioId } } : {}),
+        },
+        video: false,
+      })
+      const wasEnabled = this.stream?.getAudioTracks()[0]?.enabled ?? true
+      this.removeTracks('audio')
+      this.mergeInto(fresh)
+      this.setMic(wasEnabled)
+      this.startLevelMonitor()
+      this.notifyStream()
+      return 'granted'
+    } catch (error) {
+      return mapMediaError(error)
+    }
   }
 
   async switchAudioDevice(deviceId: string): Promise<PermissionStatus> {
@@ -215,6 +260,10 @@ export class MediaEngine {
     this.audioContext?.close().catch(() => undefined)
     this.audioContext = null
     this.analyser = null
+    this.smoothedLevel = 0
+    this.hotFrames = 0
+    this.coldFrames = 0
+    this.speaking = false
     this.streamListeners.clear()
     this.speakingListeners.clear()
   }
@@ -261,12 +310,16 @@ export class MediaEngine {
       const source = this.audioContext.createMediaStreamSource(this.stream)
       this.analyser = this.audioContext.createAnalyser()
       this.analyser.fftSize = 512
-      this.analyser.smoothingTimeConstant = 0.75
+      this.analyser.smoothingTimeConstant = 0.8
       source.connect(this.analyser)
       this.levelBuffer = new Uint8Array(this.analyser.fftSize)
     } catch {
       return
     }
+
+    this.smoothedLevel = 0
+    this.hotFrames = 0
+    this.coldFrames = 0
 
     const tick = () => {
       this.sampleLevel()
@@ -289,9 +342,25 @@ export class MediaEngine {
       sum += value * value
     }
     const rms = Math.sqrt(sum / this.levelBuffer.length)
-    const audioEnabled = this.stream?.getAudioTracks()[0]?.enabled ?? false
-    const next = audioEnabled && rms > (this.speaking ? SPEAKING_RELEASE : SPEAKING_THRESHOLD)
-    if (next !== this.speaking) this.updateSpeaking(next)
+    this.smoothedLevel = this.smoothedLevel * 0.6 + rms * 0.4
+
+    const audioEnabled = this.stream?.getAudioTracks().some((track) => track.enabled && track.readyState === 'live') ?? false
+    const active = audioEnabled && this.smoothedLevel > (this.speaking ? SPEAKING_RELEASE : SPEAKING_THRESHOLD)
+
+    if (active) this.coldFrames = 0
+    else this.hotFrames = 0
+
+    if (!this.speaking) {
+      this.hotFrames = active ? this.hotFrames + 1 : 0
+      if (active && this.hotFrames >= SPEAKING_ONSET_FRAMES) this.updateSpeaking(true)
+    } else if (!active) {
+      this.coldFrames += 1
+      if (this.coldFrames >= SPEAKING_OFFSET_FRAMES) {
+        this.hotFrames = 0
+        this.coldFrames = 0
+        this.updateSpeaking(false)
+      }
+    }
   }
 
   private updateSpeaking(speaking: boolean) {

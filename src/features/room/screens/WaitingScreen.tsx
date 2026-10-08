@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Camera, CameraOff, CheckCircle2, Mic, MicOff, X } from 'lucide-react'
+import { Camera, CameraOff, CheckCircle2, Mic, MicOff, PencilLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -10,10 +10,14 @@ export default function WaitingScreen() {
   const room = useRoomSessionStore((state) => state.room)
   const self = useRoomSessionStore((state) => state.self)
   const setStatus = useRoomSessionStore((state) => state.setStatus)
+  const nameTaken = useRoomSessionStore((state) => state.nameTaken)
   const micOn = useCallStore((state) => state.micOn)
   const cameraOn = useCallStore((state) => state.cameraOn)
 
   if (!room) return null
+
+  const nameBlocked =
+    !!nameTaken && !!self && self.name.trim().toLowerCase() === nameTaken.toLowerCase()
 
   return (
     <div className="grid min-h-dvh place-items-center bg-bg px-4 py-10">
@@ -70,10 +74,28 @@ export default function WaitingScreen() {
           ) : null}
         </AnimatePresence>
 
+        <AnimatePresence>
+          {nameBlocked && self ? (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="mt-4 rounded-xl border border-danger/50 bg-danger-soft px-4 py-3 text-left"
+            >
+              <p className="text-[13px] font-medium text-danger">
+                The name “{nameTaken}” is already used by someone else in this room.
+              </p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-subtle">
+                The host did not accept this request. Pick another name before trying again.
+              </p>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
         <div className="mt-7 flex flex-col gap-2.5">
           <Button variant="secondary" onClick={() => setStatus('prejoin')}>
-            <X className="h-4 w-4" />
-            Cancel request
+            {nameBlocked ? <PencilLine className="h-4 w-4" /> : null}
+            {nameBlocked ? 'Change name' : 'Cancel request'}
           </Button>
         </div>
 

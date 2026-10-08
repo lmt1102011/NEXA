@@ -21,6 +21,7 @@ const EVENT_TYPES = [
   'request-resolved',
   'settings',
   'kick',
+  'name-taken',
   'end',
 ] as const
 

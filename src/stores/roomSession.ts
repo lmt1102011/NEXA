@@ -19,6 +19,7 @@ interface RoomSessionState {
   self: Participant | null
   participants: Participant[]
   requests: JoinRequest[]
+  nameTaken: string | null
   messages: ChatMessage[]
   unread: number
   connected: boolean
@@ -41,6 +42,7 @@ interface RoomSessionState {
   addRequest: (request: JoinRequest) => void
   resolveRequest: (requestId: ID) => JoinRequest | undefined
   clearRequests: () => void
+  setNameTaken: (name: string | null) => void
 
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
@@ -57,6 +59,7 @@ const initialState = {
   self: null,
   participants: [] as Participant[],
   requests: [] as JoinRequest[],
+  nameTaken: null,
   messages: [] as ChatMessage[],
   unread: 0,
   connected: false,
@@ -70,6 +73,8 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
   reset: () => {
     speakingFlags.clear()
     queuedMessages.length = 0
+    const { self, room } = get()
+    if (self?.role === 'host' && room) clearPersistedRequests(room.id)
     set({ ...initialState })
   },
 
@@ -103,6 +108,7 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
       status: 'joined',
       self,
       participants: [self],
+      requests: loadPersistedRequests(room.id),
     })
     pushSystemMessage(room, `${self.name} created the room`)
     return 'joined'
@@ -207,20 +213,32 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
 
   addRequest: (request) =>
     set((state) => {
-      if (state.requests.some((r) => r.id === request.id || r.participantId === request.participantId)) {
-        return state
-      }
-      return { requests: [...state.requests, request] }
+      const existingIndex = state.requests.findIndex(
+        (r) => r.id === request.id || r.participantId === request.participantId,
+      )
+      const requests =
+        existingIndex >= 0
+          ? state.requests.map((r) => (r.participantId === request.participantId ? { ...request } : r))
+          : [...state.requests, request]
+      persistRequests(state.room?.id ?? null, requests)
+      return { requests }
     }),
 
   resolveRequest: (requestId) => {
     const request = get().requests.find((r) => r.id === requestId)
     if (!request) return undefined
-    set((state) => ({ requests: state.requests.filter((r) => r.id !== requestId) }))
+    const requests = get().requests.filter((r) => r.id !== requestId)
+    set({ requests })
+    persistRequests(get().room?.id ?? null, requests)
     return request
   },
 
-  clearRequests: () => set({ requests: [] }),
+  clearRequests: () => {
+    set({ requests: [] })
+    persistRequests(get().room?.id ?? null, [])
+  },
+
+  setNameTaken: (name) => set({ nameTaken: name }),
 
   addMessage: (message) =>
     set((state) => {
@@ -342,4 +360,38 @@ function queueSystemMessage(room: Room | null, text: string) {
       if (next) store.addMessage(next)
     }
   })
+}
+
+function requestsKey(roomId: ID) {
+  return `nexa.requests:${roomId}`
+}
+
+function loadPersistedRequests(roomId: ID): JoinRequest[] {
+  try {
+    const raw = localStorage.getItem(requestsKey(roomId))
+    if (!raw) return []
+    const data: unknown = JSON.parse(raw)
+    if (Array.isArray(data)) return data as JoinRequest[]
+  } catch {
+    // corrupt storage is treated as no requests
+  }
+  return []
+}
+
+function persistRequests(roomId: ID | null, requests: JoinRequest[]) {
+  if (!roomId) return
+  try {
+    if (requests.length === 0) localStorage.removeItem(requestsKey(roomId))
+    else localStorage.setItem(requestsKey(roomId), JSON.stringify(requests))
+  } catch {
+    // persistence is best-effort
+  }
+}
+
+function clearPersistedRequests(roomId: ID) {
+  try {
+    localStorage.removeItem(requestsKey(roomId))
+  } catch {
+    // persistence is best-effort
+  }
 }

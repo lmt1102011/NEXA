@@ -10,6 +10,7 @@ import { roomFromInviteParams } from '@/lib/invite'
 import { initRoom, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
 import { RoomHeader } from '@/features/room/RoomHeader'
 import { RoomRail } from '@/features/room/RoomRail'
+import { NameConflictBar } from '@/features/room/NameConflictBar'
 import { RoomPanel } from '@/features/room/RoomPanel'
 import RoomStage from '@/features/room/RoomStage'
 import { ControlBar } from '@/features/room/ControlBar'
@@ -87,6 +88,7 @@ export default function RoomLayout() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <RoomHeader />
+      <NameConflictBar />
 
       <div className="flex min-h-0 flex-1">
         <RoomRail />

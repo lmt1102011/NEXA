@@ -23,7 +23,7 @@ export function defaultRoomSettings(): RoomSettings {
       videoQuality: 'auto',
       audioQuality: 'auto',
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseFilter: 'light',
       autoAdjustQuality: true,
       lowBandwidth: false,
     },

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { MonitorUp, UserPlus, Users, X } from 'lucide-react'
+import { MonitorUp, UserPlus, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { mediaEngine } from '@/services/media/MediaEngine'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
-import { acceptRequest, rejectRequest, toggleScreenShare } from '@/features/room/session/sessionController'
+import { acceptRequest, rejectRequest } from '@/features/room/session/sessionController'
 import { VideoGrid } from '@/features/room/VideoGrid'
 import { VideoTile } from '@/features/room/VideoTile'
 import type { Participant } from '@/types'
@@ -83,13 +83,6 @@ function ScreenTile() {
         <MonitorUp className="h-3.5 w-3.5" />
         You are presenting
       </span>
-
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-        <Button size="sm" variant="danger" onClick={() => void toggleScreenShare()}>
-          <X className="h-4 w-4" />
-          Stop sharing
-        </Button>
-      </div>
     </div>
   )
 }

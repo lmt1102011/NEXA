@@ -4,15 +4,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, LiveDot } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
+import { cn } from '@/lib/cn'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useSessionStore } from '@/stores/session'
 import { useCallStore } from '@/stores/call'
 import { mediaEngine } from '@/services/media/MediaEngine'
-import { preparePreview, requestJoin, switchDevice, toggleCamera, toggleMic } from '@/features/room/session/sessionController'
+import { preparePreview, requestJoin, switchDevice, toggleCamera, toggleMic, nameTakenBy } from '@/features/room/session/sessionController'
 
 export default function PreJoinScreen() {
   const navigate = useNavigate()
   const room = useRoomSessionStore((state) => state.room)
+  const nameTaken = useRoomSessionStore((state) => state.nameTaken)
+  const setNameTaken = useRoomSessionStore((state) => state.setNameTaken)
   const displayName = useSessionStore((state) => state.displayName)
   const setSessionName = useSessionStore((state) => state.setName)
 
@@ -56,13 +59,23 @@ export default function PreJoinScreen() {
   if (!room) return null
 
   const requireApproval = room.settings.access.requireApproval
-  const nameError = name.trim().length === 0
+  const trimmed = name.trim()
+  const emptyName = trimmed.length === 0
+  const flaggedTaken =
+    nameTaken && trimmed.length > 0 && trimmed.toLowerCase() === nameTaken.toLowerCase() ? nameTaken : null
+  const clashFound = emptyName ? null : nameTakenBy(trimmed)
+  const conflictName = flaggedTaken ?? clashFound
+  const nameError = emptyName || conflictName !== null
 
   async function handleJoin() {
     if (nameError || submitting) return
+    if (conflictName !== null) {
+      setNameTaken(conflictName)
+      return
+    }
     setSubmitting(true)
     try {
-      await requestJoin({ name: name.trim(), micOn, cameraOn })
+      await requestJoin({ name: trimmed, micOn, cameraOn })
     } finally {
       setSubmitting(false)
     }
@@ -200,19 +213,30 @@ export default function PreJoinScreen() {
                   onChange={(event) => {
                     setName(event.target.value)
                     setSessionName(event.target.value)
+                    if (nameTaken) setNameTaken(null)
                   }}
                   maxLength={32}
                   placeholder="e.g. Tri"
-                  className="h-10 w-full rounded-lg border border-line bg-surface-2 px-3 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-150 placeholder:text-ink-subtle focus:outline-none focus:ring-2 focus:ring-accent/25"
+                  aria-invalid={nameError}
+                  className={cn(
+                    'h-10 w-full rounded-lg border bg-surface-2 px-3 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-150 placeholder:text-ink-subtle focus:outline-none focus:ring-2',
+                    conflictName !== null
+                      ? 'border-danger/60 focus:ring-danger/25'
+                      : 'border-line focus:ring-accent/25',
+                  )}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') void handleJoin()
                   }}
                 />
                 <p className="mt-1.5 text-[12.5px] text-ink-subtle">
-                  {nameError ? (
+                  {emptyName ? (
                     <span className="text-danger">Please enter a name to continue.</span>
+                  ) : conflictName !== null ? (
+                    <span className="font-medium text-danger">
+                      “{conflictName}” is already used in this room. Please choose a different name.
+                    </span>
                   ) : (
-                    <>You appear as “{name.trim()}” to everyone in the room.</>
+                    <>You appear as “{trimmed}” to everyone in the room.</>
                   )}
                 </p>
               </div>
