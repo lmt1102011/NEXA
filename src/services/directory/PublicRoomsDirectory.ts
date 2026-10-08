@@ -15,9 +15,20 @@ interface DirectoryMessage {
   deviceId: string
   at: number
   rooms: Room[]
+  endedRoomIds?: string[]
 }
 
 let started = false
+let sendRoomEnded: ((roomId: string) => void) | null = null
+
+/**
+ * Tells every online NEXA install that a room was deleted by its host, so the
+ * room vanishes from directories and local room lists immediately instead of
+ * lingering until the next announce cycle.
+ */
+export function announceRoomDeletion(roomId: string) {
+  sendRoomEnded?.(roomId)
+}
 
 function deviceId(): string {
   let id = localStorage.getItem('nexa.deviceId')
@@ -48,7 +59,19 @@ export function startPublicRoomsDirectory() {
   const action = directory.makeAction<DataPayload>('nexa:dir', {
     onMessage: (payload) => {
       const message = payload as unknown as DirectoryMessage
-      if (!message || message.deviceId === deviceId() || message.rooms.length === 0) return
+      if (!message || message.deviceId === deviceId()) return
+
+      if (message.endedRoomIds?.length) {
+        const directoryStore = useDirectoryStore.getState()
+        const roomsStore = useRoomsStore.getState()
+        for (const id of message.endedRoomIds) {
+          directoryStore.removeRoom(id)
+          roomsStore.removeRoom(id)
+        }
+        return
+      }
+
+      if (message.rooms.length === 0) return
       const now = message.at
       useDirectoryStore.getState().upsertRooms(
         message.rooms.map((room) => ({ ...room, lastActiveAt: now })),
@@ -68,6 +91,17 @@ export function startPublicRoomsDirectory() {
     if (mine.length === 0) return
     void action
       .send({ deviceId: deviceId(), at: Date.now(), rooms: mine } as unknown as DataPayload)
+      .catch(() => {})
+  }
+
+  sendRoomEnded = (roomId) => {
+    void action
+      .send({
+        deviceId: deviceId(),
+        at: Date.now(),
+        rooms: [],
+        endedRoomIds: [roomId],
+      } as unknown as DataPayload)
       .catch(() => {})
   }
 

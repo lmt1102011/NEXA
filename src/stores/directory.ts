@@ -10,6 +10,7 @@ import type { Room } from '@/types'
 interface DirectoryState {
   entries: Room[]
   upsertRooms: (rooms: Room[]) => void
+  removeRoom: (id: string) => void
   pruneRooms: (cutoff: number) => void
   findRoom: (id: string) => Room | undefined
   publicRooms: () => Room[]
@@ -24,6 +25,12 @@ export const useDirectoryStore = create<DirectoryState>((set, get) => ({
       const map = new Map(state.entries.map((room) => [room.id, room]))
       for (const room of rooms) map.set(room.id, room)
       return { entries: [...map.values()] }
+    }),
+
+  removeRoom: (id) =>
+    set((state) => {
+      const entries = state.entries.filter((room) => room.id !== id)
+      return entries.length === state.entries.length ? state : { entries }
     }),
 
   pruneRooms: (cutoff) =>

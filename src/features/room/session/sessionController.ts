@@ -4,6 +4,7 @@ import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { qualityController } from '@/services/media/QualityController'
+import { announceRoomDeletion } from '@/services/directory/PublicRoomsDirectory'
 import { buildFileMessage, buildSystemMessage, buildTextMessage } from '@/lib/chat'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore, buildSelfParticipant } from '@/stores/roomSession'
@@ -459,7 +460,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       stopLocalMedia()
       state.setStatus('ended')
       if (activeRoomId) {
-        useRoomsStore.getState().updateMeta(activeRoomId, { status: 'idle', participantCount: 0 })
+        useRoomsStore.getState().removeRoom(activeRoomId)
       }
       break
   }
@@ -814,8 +815,10 @@ export function hostEndRoom() {
   realtime?.emit({ type: 'end' })
   stopLocalMedia()
   state.setStatus('ended')
-  if (activeRoomId) {
-    useRoomsStore.getState().updateMeta(activeRoomId, { status: 'idle', participantCount: 0 })
+  const roomId = activeRoomId
+  if (roomId) {
+    useRoomsStore.getState().removeRoom(roomId)
+    announceRoomDeletion(roomId)
   }
 }
 
