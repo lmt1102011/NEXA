@@ -5,10 +5,12 @@ import App from '@/app/App'
 import { initSessionAppearance } from '@/stores/session'
 import { useRoomsStore } from '@/stores/rooms'
 import { lockZoom } from '@/lib/lockZoom'
+import { enableTapCompat } from '@/lib/tapCompat'
 import { startPublicRoomsDirectory } from '@/services/directory/PublicRoomsDirectory'
 
 initSessionAppearance()
 lockZoom()
+enableTapCompat()
 
 const container = document.getElementById('root')
 if (container) {
