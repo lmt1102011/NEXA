@@ -21,6 +21,7 @@ interface RoomSessionState {
   requests: JoinRequest[]
   nameTaken: string | null
   messages: ChatMessage[]
+  pinnedMessage: ChatMessage | null
   unread: number
   connected: boolean
 
@@ -46,6 +47,7 @@ interface RoomSessionState {
 
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
+  setPinnedMessage: (message: ChatMessage | null) => void
   toggleReaction: (messageId: ID, emoji: string, userId: ID) => void
   markRead: () => void
 
@@ -61,6 +63,7 @@ const initialState = {
   requests: [] as JoinRequest[],
   nameTaken: null,
   messages: [] as ChatMessage[],
+  pinnedMessage: null as ChatMessage | null,
   unread: 0,
   connected: false,
 }
@@ -250,7 +253,14 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
       return { messages: messages.slice(-300), unread }
     }),
 
-  setMessages: (messages) => set({ messages }),
+  setMessages: (messages) =>
+    set((state) => ({
+      messages,
+      pinnedMessage:
+        state.pinnedMessage && messages.some((m) => m.id === state.pinnedMessage?.id) ? state.pinnedMessage : null,
+    })),
+
+  setPinnedMessage: (message) => set({ pinnedMessage: message }),
 
   toggleReaction: (messageId, emoji, userId) =>
     set((state) => ({

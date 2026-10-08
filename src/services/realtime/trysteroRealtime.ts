@@ -18,6 +18,7 @@ const EVENT_TYPES = [
   'peer-leave',
   'heartbeat',
   'chat',
+  'pin',
   'reaction',
   'request',
   'request-resolved',

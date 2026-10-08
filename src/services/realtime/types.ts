@@ -8,6 +8,7 @@ export type RoomEvent =
   | { type: 'peer-leave'; participantId: ID }
   | { type: 'heartbeat'; participantId: ID; participant: Participant }
   | { type: 'chat'; message: ChatMessage }
+  | { type: 'pin'; message: ChatMessage | null }
   | { type: 'reaction'; messageId: ID; emoji: string; userId: ID }
   | { type: 'request'; request: JoinRequest }
   | { type: 'request-resolved'; requestId: ID; participantId: ID; accepted: boolean }

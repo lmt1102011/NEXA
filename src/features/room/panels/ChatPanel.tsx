@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Download, FileText, Paperclip, SendHorizontal, SmilePlus } from 'lucide-react'
+import { Download, FileText, Paperclip, Pin, SendHorizontal, SmilePlus, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/avatar'
 import { IconSmile } from '@/components/ui/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useRoomSessionStore } from '@/stores/roomSession'
-import { sendChatMessage, sendFileMessage, toggleReaction } from '@/features/room/session/sessionController'
+import {
+  pinMessage,
+  sendChatMessage,
+  sendFileMessage,
+  toggleReaction,
+} from '@/features/room/session/sessionController'
 import type { ChatMessage } from '@/types'
 
 const QUICK_EMOJI = ['👍', '❤️', '😂', '🎉', '👀', '🔥']
@@ -27,6 +32,8 @@ export function ChatPanel() {
   const room = useRoomSessionStore((state) => state.room)
   const unread = useRoomSessionStore((state) => state.unread)
   const markRead = useRoomSessionStore((state) => state.markRead)
+  const self = useRoomSessionStore((state) => state.self)
+  const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
 
   const [draft, setDraft] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -75,6 +82,30 @@ export function ChatPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {pinnedMessage ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-line bg-accent-soft/60 px-3 py-2">
+          <Pin className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <p className="min-w-0 flex-1 truncate text-[12.5px] text-ink">
+            <span className="font-medium">
+              {pinnedMessage.senderId === self?.id ? 'You' : pinnedMessage.senderName}:
+            </span>{' '}
+            {pinnedMessage.kind === 'file' && pinnedMessage.file ? pinnedMessage.file.name : pinnedMessage.text}
+          </p>
+          {self?.role === 'host' ||
+          Boolean(self?.permissions?.canModerate) ||
+          pinnedMessage.senderId === self?.id ? (
+            <button
+              type="button"
+              aria-label="Unpin message"
+              onClick={() => pinMessage(null)}
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div ref={listRef} onScroll={handleScroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto nx-scroll px-3 py-3.5">
         {messages.length === 0 ? (
           <EmptyState
@@ -153,6 +184,7 @@ export function ChatPanel() {
 
 function ChatRow({ message }: { message: ChatMessage }) {
   const self = useRoomSessionStore((state) => state.self)
+  const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
 
   if (message.kind === 'system') {
     return (
@@ -165,6 +197,8 @@ function ChatRow({ message }: { message: ChatMessage }) {
   const own = message.senderId === self?.id
   const reactionEntries = Object.entries(message.reactions)
   const mineActive = (emoji: string) => (message.reactions[emoji] ?? []).includes(self?.id ?? '')
+  const canPin = own || self?.role === 'host' || Boolean(self?.permissions?.canModerate)
+  const isPinned = pinnedMessage?.id === message.id
 
   return (
     <motion.div
@@ -250,6 +284,22 @@ function ChatRow({ message }: { message: ChatMessage }) {
               ))}
             </PopoverContent>
           </Popover>
+
+          {canPin ? (
+            <button
+              type="button"
+              aria-label={isPinned ? 'Unpin message' : 'Pin message'}
+              onClick={() => pinMessage(isPinned ? null : message)}
+              className={cn(
+                'grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 transition-colors hover:text-ink focus:opacity-100 group-hover:opacity-100',
+                isPinned
+                  ? 'border-accent/50 bg-accent-soft text-accent opacity-100'
+                  : 'text-ink-subtle opacity-0',
+              )}
+            >
+              <Pin className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
         </div>
       </div>
     </motion.div>

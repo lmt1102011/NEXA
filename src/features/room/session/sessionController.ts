@@ -1,4 +1,4 @@
-import type { ID, JoinRequest, NoiseFilter, Participant, ParticipantPermissions, ToastInput } from '@/types'
+import type { ChatMessage, ID, JoinRequest, NoiseFilter, Participant, ParticipantPermissions, ToastInput } from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
@@ -477,6 +477,9 @@ function handleRealtimeEvent(event: RoomEvent) {
     case 'chat':
       state.addMessage(event.message)
       break
+    case 'pin':
+      state.setPinnedMessage(event.message)
+      break
     case 'reaction':
       state.toggleReaction(event.messageId, event.emoji, event.userId)
       break
@@ -751,6 +754,21 @@ export function toggleReaction(messageId: ID, emoji: string) {
   if (!self) return
   state.toggleReaction(messageId, emoji, self.id)
   realtime?.emit({ type: 'reaction', messageId, emoji, userId: self.id })
+}
+
+export function pinMessage(message: ChatMessage | null) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const canModerateSelf = self.role === 'host' || Boolean(self.permissions?.canModerate)
+  if (message) {
+    if (message.kind === 'system') return
+    if (!canModerateSelf && message.senderId !== self.id) return
+  } else if (!canModerateSelf && state.pinnedMessage?.senderId !== self.id) {
+    return
+  }
+  state.setPinnedMessage(message)
+  realtime?.emit({ type: 'pin', message })
 }
 
 export async function toggleMic() {
