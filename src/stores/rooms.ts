@@ -29,6 +29,7 @@ interface RoomsState {
     patch: Partial<Pick<Room, 'name' | 'description' | 'visibility' | 'status' | 'participantCount'>>,
   ) => void
   touchRoom: (roomId: string) => void
+  reapEmptyRooms: (timeoutMs: number) => void
   removeRoom: (roomId: string) => void
 }
 
@@ -116,6 +117,18 @@ export const useRoomsStore = create<RoomsState>()(
             room.id === roomId ? { ...room, lastActiveAt: Date.now(), status: 'live' } : room,
           ),
         })),
+
+      /**
+       * Removes rooms that have been empty (nobody inside) for longer than
+       * `timeoutMs`. `participantCount` is kept at 0 whenever the last person
+       * leaves, so an idle room disappears automatically after the timeout.
+       */
+      reapEmptyRooms: (timeoutMs) =>
+        set((state) => {
+          const cutoff = Date.now() - timeoutMs
+          const rooms = state.rooms.filter((room) => room.participantCount > 0 || room.lastActiveAt >= cutoff)
+          return rooms.length === state.rooms.length ? state : { rooms }
+        }),
 
       removeRoom: (roomId) =>
         set((state) => ({ rooms: state.rooms.filter((room) => room.id !== roomId) })),
