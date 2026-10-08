@@ -20,9 +20,6 @@ export function lockZoom() {
     if (key === '+' || key === '=' || key === '-' || key === '0' || key === '_') event.preventDefault()
   }
   const onGesture = (event: Event) => event.preventDefault()
-  const onTouchMove = (event: TouchEvent) => {
-    if (event.touches.length > 1) event.preventDefault()
-  }
 
   window.addEventListener('wheel', onWheel, { passive: false })
   window.addEventListener('keydown', onKeyDown)
@@ -30,5 +27,4 @@ export function lockZoom() {
   window.addEventListener('gesturechange', onGesture)
   window.addEventListener('gestureend', onGesture)
   window.addEventListener('gesturetap', onGesture)
-  document.addEventListener('touchmove', onTouchMove, { passive: false })
 }

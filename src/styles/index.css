@@ -6,6 +6,7 @@
    NEXA design tokens — dark (default)
    --------------------------------------------------------------- */
 html {
+  touch-action: manipulation;
   --nx-bg: #0e0f14;
   --nx-surface: #14151c;
   --nx-surface-2: #191a23;
