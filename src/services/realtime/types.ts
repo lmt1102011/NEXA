@@ -1,4 +1,4 @@
-import type { ChatMessage, ID, JoinRequest, Participant } from '@/types'
+import type { ActivityTask, ChatMessage, ID, JoinRequest, Participant, Poll, RoomTimer, TodoItem } from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 
 export type RoomEvent =
@@ -9,6 +9,13 @@ export type RoomEvent =
   | { type: 'heartbeat'; participantId: ID; participant: Participant }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'pin'; message: ChatMessage | null }
+  | {
+      type: 'activity'
+      polls: Poll[]
+      tasks: ActivityTask[]
+      todos: TodoItem[]
+      timer: RoomTimer | null
+    }
   | { type: 'reaction'; messageId: ID; emoji: string; userId: ID }
   | { type: 'request'; request: JoinRequest }
   | { type: 'request-resolved'; requestId: ID; participantId: ID; accepted: boolean }

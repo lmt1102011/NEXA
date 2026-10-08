@@ -29,6 +29,7 @@ interface ControlItem {
   tone?: Tone
   active?: boolean
   badge?: number
+  dot?: boolean
   shortcut?: string
   ariaLabel: string
   onClick: () => void
@@ -47,17 +48,27 @@ function toneClass(item: ControlItem, mobile: boolean) {
 }
 
 function BadgeCount({ item, ringClass }: { item: ControlItem; ringClass: string }) {
-  if (!item.badge) return null
-  return (
-    <span
-      className={cn(
-        'absolute grid min-w-[16px] place-items-center rounded-full bg-accent-solid px-1 font-mono text-[9.5px] font-semibold leading-4 text-white',
-        ringClass,
-      )}
-    >
-      {item.badge > 9 ? '9+' : item.badge}
-    </span>
-  )
+  if (item.badge) {
+    return (
+      <span
+        className={cn(
+          'absolute grid min-w-[16px] place-items-center rounded-full bg-accent-solid px-1 font-mono text-[9.5px] font-semibold leading-4 text-white',
+          ringClass,
+        )}
+      >
+        {item.badge > 9 ? '9+' : item.badge}
+      </span>
+    )
+  }
+  if (item.dot) {
+    return (
+      <span
+        className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger-solid ring-2 ring-surface"
+        aria-hidden
+      />
+    )
+  }
+  return null
 }
 
 function DesktopControl({ item }: { item: ControlItem }) {
@@ -120,6 +131,7 @@ export function ControlBar() {
   const videoPermission = useCallStore((state) => state.videoPermission)
 
   const unread = useRoomSessionStore((state) => state.unread)
+  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const requests = useRoomSessionStore((state) => state.requests.length)
   const self = useRoomSessionStore((state) => state.self)
   const room = useRoomSessionStore((state) => state.room)
@@ -175,6 +187,7 @@ export function ControlBar() {
       icon: <Clapperboard className="h-[18px] w-[18px]" />,
       label: 'Activities',
       active: panel === 'activities',
+      dot: activitiesUnread > 0 && panel !== 'activities',
       ariaLabel: 'Open room activities',
       onClick: () => setPanel('activities'),
     },

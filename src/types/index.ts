@@ -143,6 +143,46 @@ export interface CallStats {
   quality: ConnectionQuality
 }
 
+export interface PollOption {
+  id: ID
+  text: string
+  votes: ID[]
+}
+
+export interface Poll {
+  id: ID
+  question: string
+  options: PollOption[]
+  createdBy: ID
+  createdAt: number
+  closed: boolean
+}
+
+export interface ActivityTask {
+  id: ID
+  title: string
+  note: string
+  assigneeId: ID | null
+  done: boolean
+  createdBy: ID
+  createdAt: number
+}
+
+export interface TodoItem {
+  id: ID
+  text: string
+  done: boolean
+  createdBy: ID
+  createdAt: number
+}
+
+export interface RoomTimer {
+  endsAt: number | null
+  remainingMs: number
+  running: boolean
+  startedBy: ID | null
+}
+
 export interface DeviceOption {
   deviceId: string
   label: string

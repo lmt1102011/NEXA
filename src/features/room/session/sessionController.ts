@@ -1,4 +1,16 @@
-import type { ChatMessage, ID, JoinRequest, NoiseFilter, Participant, ParticipantPermissions, ToastInput } from '@/types'
+import type {
+  ActivityTask,
+  ChatMessage,
+  ID,
+  JoinRequest,
+  NoiseFilter,
+  Participant,
+  ParticipantPermissions,
+  Poll,
+  RoomTimer,
+  ToastInput,
+  TodoItem,
+} from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
@@ -6,6 +18,7 @@ import { mediaEngine } from '@/services/media/MediaEngine'
 import { qualityController } from '@/services/media/QualityController'
 import { announceRoomDeletion } from '@/services/directory/PublicRoomsDirectory'
 import { buildFileMessage, buildSystemMessage, buildTextMessage } from '@/lib/chat'
+import { generateId } from '@/lib/utils'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore, buildSelfParticipant } from '@/stores/roomSession'
 import { useRoomsStore } from '@/stores/rooms'
@@ -480,6 +493,26 @@ function handleRealtimeEvent(event: RoomEvent) {
     case 'pin':
       state.setPinnedMessage(event.message)
       break
+    case 'activity': {
+      const previousTasks = new Map(state.tasks.map((task) => [task.id, task] as const))
+      const selfAssigned = selfId
+        ? event.tasks.filter(
+            (task) => task.assigneeId === selfId && previousTasks.get(task.id)?.assigneeId !== selfId,
+          )
+        : []
+      const pollsGrew = event.polls.length > state.polls.length
+      state.setActivities({
+        polls: event.polls,
+        tasks: event.tasks,
+        todos: event.todos,
+        timer: event.timer,
+      })
+      if (selfAssigned.length > 0) {
+        notify({ title: `New task assigned to you: “${selfAssigned[0].title}”`, variant: 'info', duration: 5000 })
+      }
+      if (selfAssigned.length > 0 || pollsGrew) state.bumpActivitiesUnread()
+      break
+    }
     case 'reaction':
       state.toggleReaction(event.messageId, event.emoji, event.userId)
       break
@@ -769,6 +802,223 @@ export function pinMessage(message: ChatMessage | null) {
   }
   state.setPinnedMessage(message)
   realtime?.emit({ type: 'pin', message })
+}
+
+function currentActivities() {
+  const state = store()
+  return { polls: state.polls, tasks: state.tasks, todos: state.todos, timer: state.timer }
+}
+
+function publishActivities(activities: ReturnType<typeof currentActivities>) {
+  realtime?.emit({ type: 'activity', ...activities })
+}
+
+function canEditActivity(self: Participant, createdBy: ID) {
+  return self.role === 'host' || Boolean(self.permissions?.canModerate) || self.id === createdBy
+}
+
+export function addPoll(question: string, optionTexts: string[]) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const trimmedQuestion = question.trim()
+  const texts = optionTexts.map((text) => text.trim()).filter(Boolean)
+  if (!trimmedQuestion || texts.length < 2) return
+  const poll: Poll = {
+    id: generateId('poll'),
+    question: trimmedQuestion,
+    options: texts.map((text) => ({ id: generateId('opt'), text, votes: [] })),
+    createdBy: self.id,
+    createdAt: Date.now(),
+    closed: false,
+  }
+  const activities = { ...currentActivities(), polls: [...state.polls, poll] }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function votePoll(pollId: ID, optionId: ID) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const polls = state.polls.map((poll) => {
+    if (poll.id !== pollId || poll.closed) return poll
+    const votedOptionId = poll.options.find((option) => option.votes.includes(self.id))?.id ?? null
+    const changeVote = votedOptionId === optionId
+    return {
+      ...poll,
+      options: poll.options.map((option) => {
+        const votes = option.votes.filter((userId) => userId !== self.id)
+        if (option.id === optionId && !changeVote) votes.push(self.id)
+        return { ...option, votes }
+      }),
+    }
+  })
+  const activities = { ...currentActivities(), polls }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function closePoll(pollId: ID) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const polls = state.polls.map((poll) => (poll.id === pollId ? { ...poll, closed: true } : poll))
+  const activities = { ...currentActivities(), polls }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function deletePoll(pollId: ID) {
+  const state = store()
+  const self = state.self
+  const target = state.polls.find((poll) => poll.id === pollId)
+  if (!self || !target || !canEditActivity(self, target.createdBy)) return
+  const activities = { ...currentActivities(), polls: state.polls.filter((poll) => poll.id !== pollId) }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function addTask(title: string, assigneeId: ID | null = null) {
+  const state = store()
+  const self = state.self
+  if (!self || !title.trim()) return
+  const task: ActivityTask = {
+    id: generateId('task'),
+    title: title.trim(),
+    note: '',
+    assigneeId,
+    done: false,
+    createdBy: self.id,
+    createdAt: Date.now(),
+  }
+  const activities = { ...currentActivities(), tasks: [...state.tasks, task] }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+function patchTask(taskId: ID, patch: Partial<ActivityTask>) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const target = state.tasks.find((task) => task.id === taskId)
+  if (!target) return
+  const isEditByOther = patch.done === undefined && patch.assigneeId === undefined
+  if (isEditByOther && !canEditActivity(self, target.createdBy)) return
+  const activities = {
+    ...currentActivities(),
+    tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
+  }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function toggleTask(taskId: ID) {
+  const state = store()
+  const target = state.tasks.find((task) => task.id === taskId)
+  if (!target) return
+  patchTask(taskId, { done: !target.done })
+}
+
+export function setTaskAssignee(taskId: ID, assigneeId: ID | null) {
+  patchTask(taskId, { assigneeId })
+}
+
+export function setTaskNote(taskId: ID, note: string) {
+  patchTask(taskId, { note })
+}
+
+export function deleteTask(taskId: ID) {
+  const state = store()
+  const self = state.self
+  const target = state.tasks.find((task) => task.id === taskId)
+  if (!self || !target || !canEditActivity(self, target.createdBy)) return
+  const activities = { ...currentActivities(), tasks: state.tasks.filter((task) => task.id !== taskId) }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function addTodo(text: string) {
+  const state = store()
+  const self = state.self
+  if (!self || !text.trim()) return
+  const item: TodoItem = {
+    id: generateId('todo'),
+    text: text.trim(),
+    done: false,
+    createdBy: self.id,
+    createdAt: Date.now(),
+  }
+  const activities = { ...currentActivities(), todos: [...state.todos, item] }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function toggleTodo(todoId: ID) {
+  const state = store()
+  const activities = {
+    ...currentActivities(),
+    todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, done: !todo.done } : todo)),
+  }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function deleteTodo(todoId: ID) {
+  const state = store()
+  const self = state.self
+  const target = state.todos.find((todo) => todo.id === todoId)
+  if (!self || !target || !canEditActivity(self, target.createdBy)) return
+  const activities = { ...currentActivities(), todos: state.todos.filter((todo) => todo.id !== todoId) }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function startTimer(durationMs: number) {
+  const state = store()
+  const self = state.self
+  if (!self || durationMs <= 0) return
+  const timer: RoomTimer = {
+    endsAt: Date.now() + durationMs,
+    remainingMs: durationMs,
+    running: true,
+    startedBy: self.id,
+  }
+  const activities = { ...currentActivities(), timer }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function pauseTimer() {
+  const state = store()
+  const timer = state.timer
+  if (!timer?.running || !timer.endsAt) return
+  const activities = {
+    ...currentActivities(),
+    timer: { ...timer, endsAt: null, remainingMs: Math.max(0, timer.endsAt - Date.now()), running: false },
+  }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function resumeTimer() {
+  const state = store()
+  const timer = state.timer
+  if (!timer || timer.running || timer.remainingMs <= 0) return
+  const activities = {
+    ...currentActivities(),
+    timer: { ...timer, endsAt: Date.now() + timer.remainingMs, running: true },
+  }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
+export function resetTimer() {
+  const state = store()
+  if (!state.timer) return
+  const activities = { ...currentActivities(), timer: null }
+  state.setActivities(activities)
+  publishActivities(activities)
 }
 
 export async function toggleMic() {

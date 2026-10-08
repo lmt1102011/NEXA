@@ -14,6 +14,7 @@ export function MoreSheet() {
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen)
   const self = useRoomSessionStore((state) => state.self)
   const requests = useRoomSessionStore((state) => state.requests.length)
+  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const sharing = useCallStore((state) => state.sharing)
   const navigate = useNavigate()
   const { roomId } = useParams()
@@ -35,7 +36,12 @@ export function MoreSheet() {
       active: sharing,
       onClick: () => void toggleScreenShare(),
     },
-    { icon: <Clapperboard className="h-4.5 w-4.5" />, label: 'Activities', onClick: () => setPanel('activities') },
+    {
+      icon: <Clapperboard className="h-4.5 w-4.5" />,
+      label: 'Activities',
+      dot: activitiesUnread > 0,
+      onClick: () => setPanel('activities'),
+    },
     { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: 'Devices', onClick: () => setModal('devices') },
     { icon: <Link2 className="h-4.5 w-4.5" />, label: 'Invite', onClick: () => setModal('invite') },
     { icon: <Keyboard className="h-4.5 w-4.5" />, label: 'Shortcuts', onClick: () => setShortcutsOpen(true) },
@@ -85,6 +91,9 @@ export function MoreSheet() {
                 )}
               >
                 {entry.icon}
+                {'dot' in entry && entry.dot ? (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger-solid ring-2 ring-surface" aria-hidden />
+                ) : null}
                 {'badge' in entry && entry.badge && entry.badge > 0 ? (
                   <span className="absolute -right-2 -top-1.5 grid min-w-[16px] place-items-center rounded-full bg-accent-solid px-1 font-mono text-[9px] font-semibold leading-4 text-white">
                     {entry.badge > 9 ? '9+' : entry.badge}

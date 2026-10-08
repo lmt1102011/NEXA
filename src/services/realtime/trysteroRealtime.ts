@@ -19,6 +19,7 @@ const EVENT_TYPES = [
   'heartbeat',
   'chat',
   'pin',
+  'activity',
   'reaction',
   'request',
   'request-resolved',

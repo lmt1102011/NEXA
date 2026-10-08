@@ -10,6 +10,7 @@ interface RailItem {
   icon: React.ReactNode
   label: string
   badge?: number
+  dot?: boolean
   onClick: () => void
 }
 
@@ -20,6 +21,7 @@ export function RoomRail() {
   const setPanel = useUiStore((state) => state.setPanel)
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen)
   const unread = useRoomSessionStore((state) => state.unread)
+  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const requests = useRoomSessionStore((state) => state.requests.length)
   const self = useRoomSessionStore((state) => state.self)
 
@@ -42,6 +44,7 @@ export function RoomRail() {
       panel: 'activities',
       icon: <Clapperboard className="h-[18px] w-[18px]" />,
       label: 'Activities',
+      dot: activitiesUnread > 0 && panel !== 'activities',
       onClick: () => setPanel('activities'),
     },
     self?.role === 'host'
@@ -75,7 +78,9 @@ export function RoomRail() {
           >
             <span className="relative">
               {item.icon}
-              {item.badge ? (
+              {item.dot ? (
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger-solid ring-2 ring-surface" aria-hidden />
+              ) : item.badge ? (
                 <span
                   className={cn(
                     'absolute -right-2.5 -top-1.5 grid min-w-[16px] place-items-center rounded-full px-1 font-mono text-[10px] font-semibold leading-4 text-white',

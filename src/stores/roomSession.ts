@@ -1,11 +1,15 @@
 import { create } from 'zustand'
 import type {
+  ActivityTask,
   ChatMessage,
   ID,
   JoinRequest,
   Participant,
+  Poll,
   Room,
+  RoomTimer,
   SessionStatus,
+  TodoItem,
 } from '@/types'
 import { mergeRoomSettings, type RoomSettingsPatch } from '@/lib/defaults'
 import { useRoomsStore } from '@/stores/rooms'
@@ -22,6 +26,11 @@ interface RoomSessionState {
   nameTaken: string | null
   messages: ChatMessage[]
   pinnedMessage: ChatMessage | null
+  polls: Poll[]
+  tasks: ActivityTask[]
+  todos: TodoItem[]
+  timer: RoomTimer | null
+  activitiesUnread: number
   unread: number
   connected: boolean
 
@@ -48,6 +57,14 @@ interface RoomSessionState {
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
   setPinnedMessage: (message: ChatMessage | null) => void
+  setActivities: (activities: {
+    polls: Poll[]
+    tasks: ActivityTask[]
+    todos: TodoItem[]
+    timer: RoomTimer | null
+  }) => void
+  bumpActivitiesUnread: () => void
+  markActivitiesRead: () => void
   toggleReaction: (messageId: ID, emoji: string, userId: ID) => void
   markRead: () => void
 
@@ -64,6 +81,11 @@ const initialState = {
   nameTaken: null,
   messages: [] as ChatMessage[],
   pinnedMessage: null as ChatMessage | null,
+  polls: [] as Poll[],
+  tasks: [] as ActivityTask[],
+  todos: [] as TodoItem[],
+  timer: null as RoomTimer | null,
+  activitiesUnread: 0,
   unread: 0,
   connected: false,
 }
@@ -261,6 +283,12 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
     })),
 
   setPinnedMessage: (message) => set({ pinnedMessage: message }),
+
+  setActivities: (activities) => set(activities),
+
+  bumpActivitiesUnread: () => set((state) => ({ activitiesUnread: state.activitiesUnread + 1 })),
+
+  markActivitiesRead: () => set({ activitiesUnread: 0 }),
 
   toggleReaction: (messageId, emoji, userId) =>
     set((state) => ({
