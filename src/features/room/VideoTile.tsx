@@ -1,10 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Crown, Mic, MicOff } from 'lucide-react'
+import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { useCallStore } from '@/stores/call'
+import { useRoomSessionStore } from '@/stores/roomSession'
+import { hostDisableCamera, hostMuteParticipant, hostRemoveParticipant } from '@/features/room/session/sessionController'
 import type { Participant } from '@/types'
 
 export function VideoTile({
@@ -20,6 +30,8 @@ export function VideoTile({
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
   const isSelf = participant.isSelf
+  const self = useRoomSessionStore((state) => state.self)
+  const isHost = self?.role === 'host'
   const hasLocalVideo = useCallStore((state) => state.hasLocalVideo)
   const remoteStream = useCallStore((state) =>
     !isSelf && participant.peerId ? state.remoteStreams[participant.peerId] : undefined,
@@ -140,8 +152,48 @@ export function VideoTile({
         {participant.role === 'host' ? <Crown className="h-3.5 w-3.5 shrink-0 text-warning" /> : null}
       </div>
 
+      {!compact && !participant.isSelf && isHost ? (
+        <div className="absolute right-2 top-2 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Actions for ${participant.name}`}
+                className="grid h-7 w-7 place-items-center rounded-lg bg-black/45 text-white/85 backdrop-blur-sm transition-colors hover:bg-black/65 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{participant.name}</DropdownMenuLabel>
+              <DropdownMenuItem disabled={!participant.micOn} onSelect={() => hostMuteParticipant(participant.id)}>
+                <MicOff className="h-4 w-4" />
+                Mute mic
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!participant.cameraOn}
+                onSelect={() => hostDisableCamera(participant.id)}
+              >
+                <VideoOff className="h-4 w-4" />
+                Turn off camera
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem destructive onSelect={() => hostRemoveParticipant(participant.id)}>
+                <Trash className="h-4 w-4" />
+                Remove from room
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : null}
+
       {!compact && participant.quality !== 'excellent' && !participant.isSelf ? (
-        <div className="absolute right-2 top-2 rounded-md bg-black/45 px-1.5 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-sm">
+        <div
+          className={
+            'absolute top-2 rounded-md bg-black/45 px-1.5 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-sm ' +
+            (isHost ? 'right-10' : 'right-2')
+          }
+        >
           {participant.quality}
         </div>
       ) : null}

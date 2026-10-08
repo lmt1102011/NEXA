@@ -49,6 +49,7 @@ let presenceTimer: number | null = null
 let lastSeen = new Map<ID, number>()
 let activeRoomId: ID | null = null
 let joinApproved = false
+let requestRetryTimer: number | null = null
 
 function notify(input: ToastInput) {
   toast(input)
@@ -132,6 +133,8 @@ function stopLocalMedia() {
 }
 
 function fullTeardown() {
+  if (requestRetryTimer !== null) window.clearInterval(requestRetryTimer)
+  requestRetryTimer = null
   stopLocalMedia()
   joinApproved = false
   store().reset()
@@ -589,6 +592,21 @@ export async function requestJoin(options: JoinOptions) {
     cameraOn: call.cameraOn,
   }
   realtime?.emit({ type: 'request', request })
+
+  // Re-send the join request until the host resolves it. The first send can
+  // race with peer discovery (no direct link to the host yet), so the request
+  // is echoed a few times instead of being lost silently.
+  if (requestRetryTimer !== null) window.clearInterval(requestRetryTimer)
+  requestRetryTimer = window.setInterval(() => {
+    if (store().status !== 'awaiting' || !realtime) {
+      if (requestRetryTimer !== null) {
+        window.clearInterval(requestRetryTimer)
+        requestRetryTimer = null
+      }
+      return
+    }
+    realtime.emit({ type: 'request', request })
+  }, 6000)
 }
 
 async function approveSelf() {
@@ -848,6 +866,15 @@ export function hostMuteParticipant(participantId: ID) {
   realtime?.emit({ type: 'peer-update', participantId, patch: { micOn: false } })
   const target = state.participants.find((participant) => participant.id === participantId)
   if (target) notify({ title: `Muted ${target.name}`, duration: 2200 })
+}
+
+export function hostDisableCamera(participantId: ID) {
+  const state = store()
+  if (state.self?.role !== 'host') return
+  state.updateParticipant(participantId, { cameraOn: false })
+  realtime?.emit({ type: 'peer-update', participantId, patch: { cameraOn: false } })
+  const target = state.participants.find((participant) => participant.id === participantId)
+  if (target) notify({ title: `Turned off ${target.name}'s camera`, duration: 2200 })
 }
 
 export function hostRemoveParticipant(participantId: ID) {
