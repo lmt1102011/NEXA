@@ -1,4 +1,4 @@
-import { Keyboard, MessageSquare, Settings, Users, Wrench } from 'lucide-react'
+import { Clapperboard, Keyboard, MessageSquare, Settings, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { useRoomSessionStore } from '@/stores/roomSession'
@@ -39,10 +39,10 @@ export function RoomRail() {
       onClick: () => setPanel('participants'),
     },
     {
-      panel: 'tools',
-      icon: <Wrench className="h-[18px] w-[18px]" />,
-      label: 'Tools',
-      onClick: () => setPanel('tools'),
+      panel: 'activities',
+      icon: <Clapperboard className="h-[18px] w-[18px]" />,
+      label: 'Activities',
+      onClick: () => setPanel('activities'),
     },
     self?.role === 'host'
       ? {

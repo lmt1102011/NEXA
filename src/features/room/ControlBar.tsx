@@ -1,6 +1,7 @@
 import {
   Camera,
   CameraOff,
+  Clapperboard,
   Ellipsis,
   Keyboard,
   MessageSquare,
@@ -10,8 +11,6 @@ import {
   PhoneOff,
   Settings,
   UserPlus,
-  Users,
-  Wrench,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Kbd } from '@/components/ui/feedback'
@@ -172,22 +171,12 @@ export function ControlBar() {
       onClick: () => setPanel('chat'),
     },
     {
-      key: 'people',
-      icon: <Users className="h-[18px] w-[18px]" />,
-      label: 'People',
-      active: panel === 'participants',
-      badge: requests,
-      shortcut: 'P',
-      ariaLabel: 'Show participants',
-      onClick: () => setPanel('participants'),
-    },
-    {
-      key: 'tools',
-      icon: <Wrench className="h-[18px] w-[18px]" />,
-      label: 'Tools',
-      active: panel === 'tools',
-      ariaLabel: 'Open room tools',
-      onClick: () => setPanel('tools'),
+      key: 'activities',
+      icon: <Clapperboard className="h-[18px] w-[18px]" />,
+      label: 'Activities',
+      active: panel === 'activities',
+      ariaLabel: 'Open room activities',
+      onClick: () => setPanel('activities'),
     },
     { key: 'divider-2', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {
@@ -263,7 +252,7 @@ export function ControlBar() {
           ))}
         <span className="mx-1 h-7 w-px bg-line" aria-hidden />
         {items
-          .filter((item) => ['chat', 'people'].includes(item.key))
+          .filter((item) => ['chat', 'activities'].includes(item.key))
           .map((item) => (
             <DesktopControl key={item.key} item={item} />
           ))}

@@ -8,7 +8,7 @@ import { useRoomsStore } from '@/stores/rooms'
 import { useDirectoryStore } from '@/stores/directory'
 import { useUiStore } from '@/stores/ui'
 import { roomFromInviteParams } from '@/lib/invite'
-import { initRoom, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
+import { initRoom, markEnteredViaRoomLink, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
 import { RoomHeader } from '@/features/room/RoomHeader'
 import { RoomRail } from '@/features/room/RoomRail'
 import { NameConflictBar } from '@/features/room/NameConflictBar'
@@ -28,7 +28,7 @@ import type { RoomPanel as RoomPanelKey } from '@/types'
 const PANEL_TITLES: Record<RoomPanelKey, string> = {
   chat: 'Chat',
   participants: 'Participants',
-  tools: 'Room tools',
+  activities: 'Activities',
   settings: 'Room settings',
 }
 
@@ -46,7 +46,10 @@ export default function RoomLayout() {
     if (roomId && !useRoomsStore.getState().findRoom(roomId)) {
       const invited = roomFromInviteParams(roomId, searchParams)
       const remote = invited ?? useDirectoryStore.getState().findRoom(roomId)
-      if (remote) useRoomsStore.getState().addRoom(remote)
+      if (remote) {
+        useRoomsStore.getState().addRoom(remote)
+        markEnteredViaRoomLink()
+      }
     }
     return initRoom(roomId)
     // eslint-disable-next-line react-hooks/exhaustive-deps

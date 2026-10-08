@@ -144,7 +144,7 @@ export interface ToastInput {
   duration?: number
 }
 
-export type RoomPanel = 'chat' | 'participants' | 'tools' | 'settings'
+export type RoomPanel = 'chat' | 'participants' | 'activities' | 'settings'
 export type RoomModal = 'invite' | 'shortcuts' | 'devices' | 'leave' | 'more'
 
 export type SessionStatus =

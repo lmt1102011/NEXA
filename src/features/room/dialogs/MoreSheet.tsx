@@ -1,4 +1,4 @@
-import { Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users, Wrench } from 'lucide-react'
+import { Clapperboard, Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
@@ -35,7 +35,7 @@ export function MoreSheet() {
       active: sharing,
       onClick: () => void toggleScreenShare(),
     },
-    { icon: <Wrench className="h-4.5 w-4.5" />, label: 'Tools', onClick: () => setPanel('tools') },
+    { icon: <Clapperboard className="h-4.5 w-4.5" />, label: 'Activities', onClick: () => setPanel('activities') },
     { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: 'Devices', onClick: () => setModal('devices') },
     { icon: <Link2 className="h-4.5 w-4.5" />, label: 'Invite', onClick: () => setModal('invite') },
     { icon: <Keyboard className="h-4.5 w-4.5" />, label: 'Shortcuts', onClick: () => setShortcutsOpen(true) },

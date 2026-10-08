@@ -50,6 +50,17 @@ let lastSeen = new Map<ID, number>()
 let activeRoomId: ID | null = null
 let joinApproved = false
 let requestRetryTimer: number | null = null
+let enteredViaLink = false
+
+/**
+ * Marks the current session as having been entered through a shared room link
+ * (or the public list). People who enter a room this way skip the approval
+ * queue: they still complete the pre-join preview (name, mic, camera) but join
+ * the room instantly afterwards.
+ */
+export function markEnteredViaRoomLink() {
+  enteredViaLink = true
+}
 
 function notify(input: ToastInput) {
   toast(input)
@@ -578,7 +589,7 @@ export async function requestJoin(options: JoinOptions) {
   state.setSelf(self)
   state.setStatus('awaiting')
 
-  if (!room.settings.access.requireApproval) {
+  if (!room.settings.access.requireApproval || enteredViaLink || room.hostId === session.userId) {
     await approveSelf()
     return
   }
@@ -904,6 +915,27 @@ export function hostTransferHost(participantId: ID) {
   realtime?.emit({ type: 'peer-update', participantId: target.id, patch: { role: 'host' } })
   state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} is now the host`))
   notify({ title: `Host transferred to ${target.name}`, variant: 'success' })
+}
+
+/**
+ * The host hands the host role to another participant and leaves the room.
+ * Peers pick up the role change through the regular `peer-update` self handler
+ * (which promotes the new host), and an optional note is posted to the room.
+ */
+export function hostLeaveWithDelegate(participantId: ID, note?: string) {
+  const state = store()
+  const self = state.self
+  if (!self || self.role !== 'host') return
+  const target = state.participants.find((participant) => participant.id === participantId)
+  if (target && target.id !== self.id) {
+    state.updateParticipant(target.id, { role: 'host' })
+    realtime?.emit({ type: 'peer-update', participantId: target.id, patch: { role: 'host' } })
+    state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} is now the host of this room`))
+  }
+  if (note && note.trim()) {
+    state.addMessage(buildSystemMessage(state.room?.id ?? '', note.trim()))
+  }
+  leaveRoom()
 }
 
 export function hostEndRoom() {

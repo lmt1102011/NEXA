@@ -1,13 +1,19 @@
 import {
+  AlarmClock,
+  BarChart3,
+  CheckSquare,
+  ClipboardList,
   Copy,
   Gauge,
   Keyboard,
   Link2,
+  ListTodo,
   Palette,
   Settings,
   SlidersHorizontal,
   Sparkles,
   UserPlus,
+  Users,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cn } from '@/lib/cn'
@@ -28,11 +34,19 @@ const BACKGROUNDS: { value: RoomBackground; label: string }[] = [
   { value: 'solid', label: 'Solid' },
 ]
 
-export function ToolsPanel() {
+const ACTIVITIES: { icon: React.ReactNode; title: string; description: string }[] = [
+  { icon: <BarChart3 className="h-4 w-4" />, title: 'Polls', description: 'Vote with a countdown.' },
+  { icon: <ClipboardList className="h-4 w-4" />, title: 'Tasks', description: 'Assign, reassign and note.' },
+  { icon: <ListTodo className="h-4 w-4" />, title: 'To-do list', description: 'Shared checklist.' },
+  { icon: <AlarmClock className="h-4 w-4" />, title: 'Timer', description: 'Count down together.' },
+]
+
+export function ActivitiesPanel() {
   const navigate = useNavigate()
   const { roomId } = useParams()
   const room = useRoomSessionStore((state) => state.room)
   const self = useRoomSessionStore((state) => state.self)
+  const setPanel = useUiStore((state) => state.setPanel)
   const setModal = useUiStore((state) => state.setModal)
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen)
   const lowBandwidth = useCallStore((state) => state.lowBandwidth)
@@ -46,8 +60,15 @@ export function ToolsPanel() {
   return (
     <div className="h-full space-y-5 overflow-y-auto nx-scroll px-3 py-3.5">
       <section>
-        <SectionTitle icon={<UserPlus className="h-3.5 w-3.5" />} title="Invite & share" />
+        <SectionTitle icon={<Users className="h-3.5 w-3.5" />} title="People" />
         <div className="mt-2 space-y-2">
+          <ToolRow
+            icon={<Users className="h-4 w-4" />}
+            title="People in the room"
+            description="Manage participants, requests and permissions."
+            action="Open"
+            onClick={() => setPanel('participants')}
+          />
           <ToolRow
             icon={<UserPlus className="h-4 w-4" />}
             title="Invite people"
@@ -62,6 +83,27 @@ export function ToolsPanel() {
             action={copied ? 'Copied' : 'Copy'}
             onClick={() => void copy(link)}
           />
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle icon={<Sparkles className="h-3.5 w-3.5" />} title="Games & tasks" />
+        <div className="mt-2 space-y-2">
+          {ACTIVITIES.map((activity) => (
+            <div
+              key={activity.title}
+              className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-surface-2/60 p-3 opacity-70"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-3 text-ink-muted">
+                {activity.icon}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13.5px] font-medium text-ink">{activity.title}</span>
+                <span className="block truncate text-[12px] text-ink-subtle">{activity.description}</span>
+              </span>
+              <CheckSquare className="h-4 w-4 shrink-0 text-ink-muted/60" />
+            </div>
+          ))}
         </div>
       </section>
 
@@ -115,7 +157,7 @@ export function ToolsPanel() {
       </section>
 
       <section>
-        <SectionTitle icon={<Sparkles className="h-3.5 w-3.5" />} title="Host" />
+        <SectionTitle icon={<Settings className="h-3.5 w-3.5" />} title="Host" />
         <div className="mt-2 space-y-2">
           {isHost ? (
             <ToolRow
