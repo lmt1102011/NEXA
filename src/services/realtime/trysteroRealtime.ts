@@ -16,6 +16,7 @@ const EVENT_TYPES = [
   'peer-ack',
   'peer-update',
   'peer-leave',
+  'heartbeat',
   'chat',
   'reaction',
   'request',
@@ -247,6 +248,19 @@ export class TrysteroRealtimeService implements RealtimeService {
     this.statsPrev = null
   }
 
+  /**
+   * Treats a participant as gone even if trystero hasn't detected the wire
+   * dropping yet (e.g. the tab was killed without a graceful leave). Cleans
+   * the peer→participant mapping and surfaces `peer-leave` to the session, so
+   * the participant disappears from rosters, remote streams are torn down and
+   * a later reconnect is treated as a fresh join.
+   */
+  forcePeerLeave(participantId: ID) {
+    if (participantId === this.self?.id) return
+    const peerId = [...this.participantByPeer.entries()].find(([, id]) => id === participantId)?.[0]
+    if (peerId) this.handlePeerLeave(peerId)
+  }
+
   emit(event: RoomEvent) {
     this.send(event.type, event)
   }
@@ -292,6 +306,16 @@ export class TrysteroRealtimeService implements RealtimeService {
         const next = { ...participant, isSelf: false, peerId }
         this.rememberPeer(peerId, participant.id)
         this.dispatch({ type: 'peer-ack', participant: next })
+        break
+      }
+      case 'heartbeat': {
+        const participantId = event.participantId
+        this.rememberPeer(peerId, participantId)
+        this.dispatch({
+          type: 'heartbeat',
+          participantId,
+          participant: { ...event.participant, isSelf: false, peerId },
+        })
         break
       }
       case 'peer-update':

@@ -16,6 +16,15 @@ const STATS_INTERVAL_MS = 3000
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
 /**
+ * Participants broadcast a heartbeat every PRESENCE_INTERVAL_MS and everyone
+ * drops peers that go silent for STALE_EVICT_MS. This catches the case where
+ * someone kills the tab (or their network) without a graceful leave, so no one
+ * stays listed in a room they are no longer connected to.
+ */
+const PRESENCE_INTERVAL_MS = 5000
+const STALE_EVICT_MS = 20000
+
+/**
  * Outbound video bitrate ceiling (kbps) per connection quality. WebRTC keeps
  * its own congestion control; these caps just prevent the encoder from
  * flooding a weak uplink, which keeps calls smooth instead of buffering.
@@ -36,6 +45,8 @@ let offRemoteStream: (() => void) | null = null
 let offSpeaking: (() => void) | null = null
 let offStream: (() => void) | null = null
 let statsTimer: number | null = null
+let presenceTimer: number | null = null
+let lastSeen = new Map<ID, number>()
 let activeRoomId: ID | null = null
 let joinApproved = false
 
@@ -69,6 +80,7 @@ export function initRoom(roomId: ID): () => void {
     realtime.announce()
     wireSelfMedia()
     startStatsMonitor()
+    startPresenceMonitor()
     void prepareMedia(
       store().room?.settings.participants.defaultMic ?? true,
       store().room?.settings.participants.defaultCamera ?? true,
@@ -113,6 +125,7 @@ function stopLocalMedia() {
   offSpeaking = null
   offStream?.()
   offStream = null
+  stopPresenceMonitor()
   cleanupTransport()
   mediaEngine.dispose()
   useCallStore.getState().reset()
@@ -199,6 +212,48 @@ function startStatsMonitor() {
 function stopStatsMonitor() {
   if (statsTimer !== null) window.clearInterval(statsTimer)
   statsTimer = null
+}
+
+/**
+ * Records proof-of-life for a participant. Anyone a session last heard from at
+ * least STALE_EVICT_MS ago is treated as gone (tab killed, network dropped)
+ * and evicted — without waiting for a peer-level disconnect notice.
+ */
+function touchParticipant(participantId: ID) {
+  lastSeen.set(participantId, Date.now())
+}
+
+function evictSilentPeers() {
+  const state = store()
+  const now = Date.now()
+  for (const participant of state.participants) {
+    if (participant.isSelf) continue
+    const seen = lastSeen.get(participant.id)
+    if (seen === undefined || now - seen <= STALE_EVICT_MS) continue
+    lastSeen.delete(participant.id)
+    if (participant.peerId) realtime?.forcePeerLeave(participant.id)
+    state.removeParticipant(participant.id)
+  }
+}
+
+function startPresenceMonitor() {
+  if (presenceTimer !== null) return
+  const tick = () => {
+    const self = store().self
+    if (self && realtime) {
+      lastSeen.set(self.id, Date.now())
+      realtime.emit({ type: 'heartbeat', participantId: self.id, participant: self })
+    }
+    evictSilentPeers()
+  }
+  tick()
+  presenceTimer = window.setInterval(tick, PRESENCE_INTERVAL_MS)
+}
+
+function stopPresenceMonitor() {
+  if (presenceTimer !== null) window.clearInterval(presenceTimer)
+  presenceTimer = null
+  lastSeen.clear()
 }
 
 async function refreshDevices() {
@@ -343,6 +398,7 @@ function handleRealtimeEvent(event: RoomEvent) {
   switch (event.type) {
     case 'peer-hello': {
       if (event.participant.id === selfId) return
+      touchParticipant(event.participant.id)
       state.addParticipant(sanitizeParticipant(event.participant))
       if (state.self?.role === 'host') {
         const clash = nameTakenBy(event.participant.name, event.participant.id)
@@ -352,10 +408,19 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'peer-ack': {
       if (event.participant.id === selfId) return
+      touchParticipant(event.participant.id)
       state.addParticipant(sanitizeParticipant(event.participant))
       if (state.self?.role === 'host') {
         const clash = nameTakenBy(event.participant.name, event.participant.id)
         if (clash) flagNameClash(clash, event.participant.id)
+      }
+      break
+    }
+    case 'heartbeat': {
+      if (event.participantId === selfId) break
+      touchParticipant(event.participantId)
+      if (!state.participants.some((p) => p.id === event.participantId)) {
+        state.addParticipant(sanitizeParticipant(event.participant))
       }
       break
     }
@@ -377,6 +442,7 @@ function handleRealtimeEvent(event: RoomEvent) {
         if (promoted) notify({ title: 'You are now the host of this room', variant: 'success' })
         break
       }
+      touchParticipant(event.participantId)
       state.updateParticipant(event.participantId, { ...event.patch, isSelf: false })
       if (state.self?.role === 'host' && event.patch.name !== undefined) {
         const clash = nameTakenBy(event.patch.name, event.participantId)
@@ -386,6 +452,7 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'peer-leave': {
       if (event.participantId === selfId) return
+      lastSeen.delete(event.participantId)
       state.removeParticipant(event.participantId)
       break
     }
@@ -534,6 +601,7 @@ async function approveSelf() {
   realtime?.announce()
   wireSelfMedia()
   startStatsMonitor()
+  startPresenceMonitor()
   await refreshDevices()
   pushOutgoingStream()
 }

@@ -6,6 +6,7 @@ export type RoomEvent =
   | { type: 'peer-ack'; participant: Participant }
   | { type: 'peer-update'; participantId: ID; patch: Partial<Participant> }
   | { type: 'peer-leave'; participantId: ID }
+  | { type: 'heartbeat'; participantId: ID; participant: Participant }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'reaction'; messageId: ID; emoji: string; userId: ID }
   | { type: 'request'; request: JoinRequest }
@@ -38,6 +39,7 @@ export interface RealtimeService {
   setVideoMaxBitrate: (kbps: number | null) => void
   measureStats: () => Promise<StatsSample | null>
   disconnect: () => void
+  forcePeerLeave: (participantId: ID) => void
   emit: (event: RoomEvent) => void
   on: (listener: RoomEventListener) => () => void
   onRemoteStream: (listener: RemoteStreamListener) => () => void
