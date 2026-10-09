@@ -1,4 +1,4 @@
-import { Clapperboard, Keyboard, MessageSquare, Settings, Users } from 'lucide-react'
+import { Keyboard, MessageSquare, Settings, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
@@ -23,7 +23,6 @@ export function RoomRail() {
   const setPanel = useUiStore((state) => state.setPanel)
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen)
   const unread = useRoomSessionStore((state) => state.unread)
-  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const requests = useRoomSessionStore((state) => state.requests.length)
   const self = useRoomSessionStore((state) => state.self)
 
@@ -41,13 +40,6 @@ export function RoomRail() {
       label: t('People'),
       badge: requests,
       onClick: () => setPanel('participants'),
-    },
-    {
-      panel: 'activities',
-      icon: <Clapperboard className="h-[18px] w-[18px]" />,
-      label: t('Activities'),
-      dot: activitiesUnread > 0 && panel !== 'activities',
-      onClick: () => setPanel('activities'),
     },
     self?.role === 'host'
       ? {

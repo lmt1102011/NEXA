@@ -1,4 +1,4 @@
-import { Clapperboard, Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users } from 'lucide-react'
+import { Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
@@ -15,7 +15,6 @@ export function MoreSheet() {
   const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen)
   const self = useRoomSessionStore((state) => state.self)
   const requests = useRoomSessionStore((state) => state.requests.length)
-  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const sharing = useCallStore((state) => state.sharing)
   const navigate = useNavigate()
   const { roomId } = useParams()
@@ -37,12 +36,6 @@ export function MoreSheet() {
       tone: 'danger',
       active: sharing,
       onClick: () => void toggleScreenShare(),
-    },
-    {
-      icon: <Clapperboard className="h-4.5 w-4.5" />,
-      label: t('Activities'),
-      dot: activitiesUnread > 0,
-      onClick: () => setPanel('activities'),
     },
     { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: t('Devices'), onClick: () => setModal('devices') },
     { icon: <Link2 className="h-4.5 w-4.5" />, label: t('Invite'), onClick: () => setModal('invite') },

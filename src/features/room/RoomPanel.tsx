@@ -1,15 +1,14 @@
-import { Clapperboard, MessageSquare, X } from 'lucide-react'
+import { MessageSquare, Users, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { t, useT } from '@/lib/i18n'
 import { useUiStore } from '@/stores/ui'
 import { ChatPanel } from '@/features/room/panels/ChatPanel'
 import { ParticipantsPanel } from '@/features/room/panels/ParticipantsPanel'
-import { ActivitiesPanel } from '@/features/room/panels/ActivitiesPanel'
 import type { RoomPanel as RoomPanelKey } from '@/types'
 
 const TABS: { key: RoomPanelKey; label: string; icon: React.ReactNode }[] = [
   { key: 'chat', label: t('Chat'), icon: <MessageSquare className="h-4 w-4" /> },
-  { key: 'activities', label: t('Activities'), icon: <Clapperboard className="h-4 w-4" /> },
+  { key: 'participants', label: t('People'), icon: <Users className="h-4 w-4" /> },
 ]
 
 export function RoomPanel({ className, embedded = true }: { className?: string; embedded?: boolean }) {
@@ -51,13 +50,7 @@ export function RoomPanel({ className, embedded = true }: { className?: string; 
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {active === 'chat' ? (
-          <ChatPanel />
-        ) : active === 'participants' ? (
-          <ParticipantsPanel />
-        ) : (
-          <ActivitiesPanel />
-        )}
+        {active === 'chat' ? <ChatPanel /> : <ParticipantsPanel />}
       </div>
     </div>
   )

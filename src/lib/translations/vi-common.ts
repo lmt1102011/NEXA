@@ -87,6 +87,8 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Sharing screen': 'Đang chia sẻ màn hình',
 
   // ---- activity dock / drawer ----
+  New: 'Mới',
+  'Add a note…': 'Thêm ghi chú…',
   'Activities': 'Hoạt động',
   'Activities · {count}': 'Hoạt động · {count}',
   'Collapse activities': 'Thu gọn hoạt động',

@@ -6,17 +6,23 @@ import {
   ClipboardList,
   ListTodo,
   Plus,
-  Sparkles,
   Trash2,
-  UserPlus,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Segmented } from '@/components/ui/segmented'
@@ -42,150 +48,161 @@ import {
 import { formatDuration } from '@/lib/utils'
 import type { ActivityTask } from '@/types'
 
-type CreateKind = 'poll' | 'task' | 'todo' | 'timer'
+type ActivityKind = 'timer' | 'poll' | 'task' | 'todo'
 
-const CREATE_OPTIONS: { kind: CreateKind; icon: typeof BarChart3; labelKey: string }[] = [
-  { kind: 'poll', icon: BarChart3, labelKey: 'New poll' },
-  { kind: 'task', icon: ClipboardList, labelKey: 'New task' },
-  { kind: 'todo', icon: ListTodo, labelKey: 'New to-do' },
-  { kind: 'timer', icon: AlarmClock, labelKey: 'New timer' },
+const KIND_ORDER: ActivityKind[] = ['timer', 'poll', 'task', 'todo']
+
+const KIND_ICON: Record<ActivityKind, typeof BarChart3> = {
+  timer: AlarmClock,
+  poll: BarChart3,
+  task: ClipboardList,
+  todo: ListTodo,
+}
+
+const KIND_TITLE: Record<ActivityKind, string> = {
+  timer: 'Timer',
+  poll: 'Polls',
+  task: 'Tasks',
+  todo: 'Todo list',
+}
+
+const CREATE_OPTIONS: { kind: ActivityKind; labelKey: string }[] = [
+  { kind: 'poll', labelKey: 'New poll' },
+  { kind: 'task', labelKey: 'New task' },
+  { kind: 'todo', labelKey: 'New to-do' },
+  { kind: 'timer', labelKey: 'New timer' },
 ]
 
-export function ActivitiesPanel() {
+const triggerClass =
+  'relative grid h-9 w-9 place-items-center rounded-lg border border-line bg-surface-2 text-ink-muted transition-colors hover:border-line-strong hover:text-ink'
+
+export function ActivityBar() {
   const t = useT()
-  const markActivitiesRead = useRoomSessionStore((state) => state.markActivitiesRead)
   const pollCount = useRoomSessionStore((state) => state.polls.length)
   const taskCount = useRoomSessionStore((state) => state.tasks.length)
   const todoCount = useRoomSessionStore((state) => state.todos.length)
-  const [createKind, setCreateKind] = useState<CreateKind | null>(null)
+  const hasTimer = useRoomSessionStore((state) => Boolean(state.timer))
+  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
+  const markActivitiesRead = useRoomSessionStore((state) => state.markActivitiesRead)
+  const [openKind, setOpenKind] = useState<ActivityKind | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createKind, setCreateKind] = useState<ActivityKind | null>(null)
 
   useEffect(() => {
-    markActivitiesRead()
-  }, [markActivitiesRead])
+    if (openKind) markActivitiesRead()
+  }, [openKind, markActivitiesRead])
+
+  const counts: Record<ActivityKind, number> = {
+    timer: hasTimer ? 1 : 0,
+    poll: pollCount,
+    task: taskCount,
+    todo: todoCount,
+  }
+  const visibleKinds = KIND_ORDER.filter((kind) => counts[kind] > 0)
+
+  function startCreate(kind: ActivityKind) {
+    setOpenKind(null)
+    setCreateOpen(false)
+    setCreateKind(kind)
+  }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-ink-subtle">
-          <Sparkles className="h-3.5 w-3.5" />
-          {t('Activities')}
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="primary" className="ml-auto h-8 pl-2 pr-2.5">
-              <Plus className="h-4 w-4" />
-              <span className="hidden xl:inline">{t('Add activity')}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" sideOffset={6} className="w-56 p-1.5">
-            <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
-              {t('Add activity')}
-            </p>
-            {CREATE_OPTIONS.map((option) => (
+    <>
+      <Popover open={createOpen} onOpenChange={setCreateOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={t('Add activity')}
+            title={t('Add activity')}
+            className={cn(triggerClass, 'text-ink')}
+          >
+            <Plus className="h-4 w-4" />
+            {activitiesUnread > 0 ? (
+              <span
+                className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger-solid ring-2 ring-surface"
+                aria-hidden
+              />
+            ) : null}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" sideOffset={6} className="w-56 p-1.5">
+          <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+            {t('Add activity')}
+          </p>
+          {CREATE_OPTIONS.map((option) => {
+            const Icon = KIND_ICON[option.kind]
+            return (
               <button
                 key={option.kind}
                 type="button"
-                onClick={() => setCreateKind(option.kind)}
+                onClick={() => startCreate(option.kind)}
                 className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] font-medium text-ink transition-colors hover:bg-surface-3"
               >
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-surface-3 text-accent">
-                  <option.icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" />
                 </span>
                 {t(option.labelKey)}
               </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-      </div>
+            )
+          })}
+        </PopoverContent>
+      </Popover>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto nx-scroll px-3 pb-4 pt-3">
-        <TimerSection />
-        <Section
-          title={t('Polls')}
-          icon={<BarChart3 className="h-4 w-4 text-accent" />}
-          count={pollCount}
-          empty={{
-            title: t('No polls yet'),
-            description: t('Start a quick vote — everyone can vote live.'),
-            onCreate: () => setCreateKind('poll'),
-            createLabel: t('New poll'),
-          }}
-        >
-          <PollsList />
-        </Section>
-        <Section
-          title={t('Tasks')}
-          icon={<ClipboardList className="h-4 w-4 text-accent" />}
-          count={taskCount}
-          empty={{
-            title: t('No tasks yet'),
-            description: t('Assign work to someone and track it live.'),
-            onCreate: () => setCreateKind('task'),
-            createLabel: t('New task'),
-          }}
-        >
-          <TasksList />
-        </Section>
-        <Section
-          title={t('Todo list')}
-          icon={<ListTodo className="h-4 w-4 text-accent" />}
-          count={todoCount}
-          empty={{
-            title: t('Nothing on the list'),
-            description: t('A shared checklist for everyone in the room.'),
-            onCreate: () => setCreateKind('todo'),
-            createLabel: t('New to-do'),
-          }}
-        >
-          <TodosList />
-        </Section>
-        <p className="flex items-center gap-1 text-[12px] text-ink-subtle">
-          <UserPlus className="h-3 w-3" />
-          {t('Activities are shared live with everyone in the room.')}
-        </p>
-      </div>
+      {visibleKinds.map((kind) => {
+        const Icon = KIND_ICON[kind]
+        const count = counts[kind]
+        return (
+          <Popover
+            key={kind}
+            open={openKind === kind}
+            onOpenChange={(open) => setOpenKind(open ? kind : null)}
+          >
+            <PopoverTrigger asChild>
+              <button type="button" aria-label={t(KIND_TITLE[kind])} title={t(KIND_TITLE[kind])} className={triggerClass}>
+                <Icon className="h-4 w-4" />
+                {count > 1 ? (
+                  <span className="absolute -right-1.5 -top-1.5 grid min-w-[16px] place-items-center rounded-full bg-accent-solid px-1 font-mono text-[9px] font-semibold leading-4 text-white">
+                    {count > 9 ? '9+' : count}
+                  </span>
+                ) : (
+                  <span
+                    className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent-solid"
+                    aria-hidden
+                  />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" sideOffset={6} className="w-[min(380px,calc(100vw-2rem))] p-0">
+              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{t(KIND_TITLE[kind])}</h3>
+                <span className="rounded-full bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-ink-subtle">{count}</span>
+                <Button size="sm" variant="secondary" className="h-7 px-2" onClick={() => startCreate(kind)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('New')}
+                </Button>
+              </div>
+              <div className="max-h-[min(60vh,420px)] space-y-2 overflow-y-auto nx-scroll p-3">
+                {kind === 'timer' ? <TimerCard /> : null}
+                {kind === 'poll' ? <PollsList /> : null}
+                {kind === 'task' ? <TasksList /> : null}
+                {kind === 'todo' ? <TodosList /> : null}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )
+      })}
 
-      {createKind ? (
-        <CreateDialog key={createKind} kind={createKind} onClose={() => setCreateKind(null)} />
-      ) : null}
-    </div>
+      {createKind ? <CreateDialog kind={createKind} onClose={() => setCreateKind(null)} /> : null}
+    </>
   )
 }
 
-function Section({ title, icon, count, empty, children }: {
-  title: string
-  icon: React.ReactNode
-  count: number
-  empty: { title: string; description: string; onCreate: () => void; createLabel: string }
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <div className="mb-2 flex items-center gap-1.5">
-        {icon}
-        <h2 className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink">{title}</h2>
-        <span className="rounded-full bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-ink-subtle">{count}</span>
-      </div>
-      <div className="space-y-2">
-        {count === 0 ? (
-          <EmptyState
-            icon={icon}
-            title={empty.title}
-            description={empty.description}
-            className="py-5"
-            action={
-              <Button size="sm" onClick={empty.onCreate}>
-                <Plus className="h-3.5 w-3.5" />
-                {empty.createLabel}
-              </Button>
-            }
-          />
-        ) : (
-          children
-        )}
-      </div>
-    </section>
-  )
+function activityNote(note?: string) {
+  if (!note || !note.trim()) return null
+  return <p className="mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-subtle">{note}</p>
 }
 
 function useActivityPermissions() {
@@ -210,7 +227,10 @@ function PollsList() {
         return (
           <div key={poll.id} className="space-y-2 rounded-xl border border-line bg-surface p-3">
             <div className="flex items-start gap-2">
-              <p className="min-w-0 flex-1 text-[13.5px] font-medium text-ink">{poll.question}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13.5px] font-medium text-ink">{poll.question}</p>
+                {activityNote(poll.note)}
+              </div>
               {poll.closed ? (
                 <Badge variant="accent" className="shrink-0">
                   {t('Closed')}
@@ -322,6 +342,7 @@ function TaskRow({ task }: { task: ActivityTask }) {
           <p className={cn('text-[13.5px] leading-snug', task.done ? 'text-ink-subtle line-through' : 'text-ink')}>
             {task.title}
           </p>
+          {!noteOpen ? activityNote(task.note) : null}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {mine ? (
               <Badge variant="accent" className="text-[11px]">
@@ -376,7 +397,7 @@ function TaskRow({ task }: { task: ActivityTask }) {
           onBlur={() => {
             if (noteDraft !== task.note) setTaskNote(task.id, noteDraft)
           }}
-          placeholder={t('Add a note for this task…')}
+          placeholder={t('Add a note…')}
           className="mt-2 min-h-[60px] text-[13px]"
         />
       ) : null}
@@ -399,27 +420,30 @@ function TodosList() {
       </p>
       <div className="space-y-1.5">
         {todos.map((todo) => (
-          <div key={todo.id} className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-2.5 py-2">
+          <div key={todo.id} className="flex items-start gap-2.5 rounded-lg border border-line bg-surface px-2.5 py-2">
             <button
               type="button"
               aria-label={todo.done ? t('Mark as not done') : t('Mark as done')}
               onClick={() => toggleTodo(todo.id)}
               className={cn(
-                'grid shrink-0 place-items-center rounded-md border transition-colors',
+                'mt-0.5 grid shrink-0 place-items-center rounded-md border transition-colors',
                 todo.done ? 'border-accent bg-accent-solid text-white' : 'border-line bg-surface-2 hover:border-line-strong',
               )}
               style={{ height: 18, width: 18 }}
             >
               {todo.done ? <Check className="h-3 w-3" /> : null}
             </button>
-            <span
-              className={cn(
-                'min-w-0 flex-1 truncate text-[13px]',
-                todo.done ? 'text-ink-subtle line-through' : 'text-ink',
-              )}
-            >
-              {todo.text}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span
+                className={cn(
+                  'block text-[13px]',
+                  todo.done ? 'text-ink-subtle line-through' : 'text-ink',
+                )}
+              >
+                {todo.text}
+              </span>
+              {activityNote(todo.note)}
+            </div>
             {canEdit(todo.createdBy) ? (
               <button
                 type="button"
@@ -437,13 +461,10 @@ function TodosList() {
   )
 }
 
-const TIMER_QUICK = [300_000, 600_000, 1_500_000]
-
-function TimerSection() {
+function TimerCard() {
   const timer = useRoomSessionStore((state) => state.timer)
   const t = useT()
   const [, setTick] = useState(0)
-  const [minutes, setMinutes] = useState('5')
   const running = Boolean(timer?.running)
 
   useEffect(() => {
@@ -452,107 +473,53 @@ function TimerSection() {
     return () => window.clearInterval(id)
   }, [running])
 
-  const remainingMs = timer
-    ? timer.running && timer.endsAt
-      ? Math.max(0, timer.endsAt - Date.now())
-      : timer.remainingMs
-    : 0
-  const finished = Boolean(timer?.running) && remainingMs <= 0
-  const totalMs = timer?.remainingMs && timer.remainingMs > 0 ? timer.remainingMs : 1
-  const progress = timer ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0
+  if (!timer) return null
 
-  function start() {
-    const value = Number.parseFloat(minutes)
-    if (!Number.isFinite(value) || value <= 0) return
-    startTimer(Math.round(value * 60_000))
-  }
+  const remainingMs = timer.running && timer.endsAt ? Math.max(0, timer.endsAt - Date.now()) : timer.remainingMs
+  const finished = Boolean(timer.running) && remainingMs <= 0
+  const totalMs = timer.remainingMs && timer.remainingMs > 0 ? timer.remainingMs : 1
+  const progress = Math.max(0, Math.min(1, remainingMs / totalMs))
 
   return (
-    <section>
-      <div className="mb-2 flex items-center gap-1.5">
-        <AlarmClock className="h-4 w-4 text-accent" />
-        <h2 className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink">{t('Timer')}</h2>
-        {timer ? (
-          <span className="rounded-full bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-ink-subtle">
-            {finished ? t("Time's up!") : t('Active')}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="rounded-xl border border-line bg-surface p-3">
-        {timer ? (
-          <>
-            <p
-              className={cn(
-                'text-center font-mono text-[32px] font-semibold leading-none tracking-tight',
-                finished ? 'text-danger' : 'text-ink',
-              )}
-              aria-live="polite"
-            >
-              {formatDuration(Math.ceil(remainingMs / 1000))}
-            </p>
-            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-3">
-              <div
-                className={cn('h-full rounded-full transition-all', finished ? 'bg-danger' : 'bg-accent-solid')}
-                style={{ width: `${progress * 100}%` }}
-              />
-            </div>
-            <p className="mt-2 text-center text-[12px] text-ink-subtle">
-              {finished
-                ? t("Time's up!")
-                : timer.running
-                  ? t('Counting down for everyone in the room.')
-                  : t('Paused.')}
-            </p>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              {timer.running && !finished ? (
-                <Button variant="secondary" size="sm" onClick={pauseTimer}>
-                  {t('Pause')}
-                </Button>
-              ) : timer.remainingMs > 0 ? (
-                <Button variant="secondary" size="sm" onClick={resumeTimer}>
-                  {t('Resume')}
-                </Button>
-              ) : null}
-              <Button variant="ghost" size="sm" onClick={resetTimer}>
-                {t('Reset')}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={180}
-                value={minutes}
-                onChange={(event) => setMinutes(event.target.value)}
-                aria-label={t('Minutes')}
-                className="h-8 w-16 px-2 text-center text-[13px]"
-              />
-              <Button variant="primary" size="sm" onClick={start} disabled={!Number.isFinite(Number(minutes)) || Number(minutes) <= 0}>
-                <AlarmClock className="h-3.5 w-3.5" />
-                {t('Start')}
-              </Button>
-            </div>
-            <div className="flex items-center justify-center gap-1.5">
-              {TIMER_QUICK.map((ms) => (
-                <button
-                  key={ms}
-                  type="button"
-                  onClick={() => startTimer(ms)}
-                  className="inline-flex h-8 items-center gap-1 rounded-full border border-line bg-surface-2 px-2.5 font-mono text-[12px] font-semibold text-ink transition-colors hover:border-line-strong"
-                >
-                  +{formatDuration(ms / 1000)}
-                </button>
-              ))}
-            </div>
-            <p className="text-center text-[12px] text-ink-subtle">{t('Start a countdown everyone can see.')}</p>
-          </div>
+    <div className="rounded-xl border border-line bg-surface p-3">
+      <p
+        className={cn(
+          'text-center font-mono text-[32px] font-semibold leading-none tracking-tight',
+          finished ? 'text-danger' : 'text-ink',
         )}
+        aria-live="polite"
+      >
+        {formatDuration(Math.ceil(remainingMs / 1000))}
+      </p>
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-3">
+        <div
+          className={cn('h-full rounded-full transition-all', finished ? 'bg-danger' : 'bg-accent-solid')}
+          style={{ width: `${progress * 100}%` }}
+        />
       </div>
-    </section>
+      {activityNote(timer.note)}
+      <p className="mt-2 text-center text-[12px] text-ink-subtle">
+        {finished
+          ? t("Time's up!")
+          : timer.running
+            ? t('Counting down for everyone in the room.')
+            : t('Paused.')}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        {timer.running && !finished ? (
+          <Button variant="secondary" size="sm" onClick={pauseTimer}>
+            {t('Pause')}
+          </Button>
+        ) : timer.remainingMs > 0 ? (
+          <Button variant="secondary" size="sm" onClick={resumeTimer}>
+            {t('Resume')}
+          </Button>
+        ) : null}
+        <Button variant="ghost" size="sm" onClick={resetTimer}>
+          {t('Reset')}
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -592,7 +559,7 @@ function DialogShell({ titleKey, icon, onClose, children, footer }: {
   )
 }
 
-function CreateDialog({ kind, onClose }: { kind: CreateKind; onClose: () => void }) {
+function CreateDialog({ kind, onClose }: { kind: ActivityKind; onClose: () => void }) {
   if (kind === 'poll') return <CreatePollDialog onClose={onClose} />
   if (kind === 'task') return <CreateTaskDialog onClose={onClose} />
   if (kind === 'todo') return <CreateTodoDialog onClose={onClose} />
@@ -603,6 +570,7 @@ function CreatePollDialog({ onClose }: { onClose: () => void }) {
   const t = useT()
   const [question, setQuestion] = useState('')
   const [options, setOptions] = useState(['', ''])
+  const [note, setNote] = useState('')
   const canSubmit = question.trim().length > 0 && options.filter((option) => option.trim()).length >= 2
   const hasMoreThanTwo = options.length > 2
 
@@ -618,7 +586,7 @@ function CreatePollDialog({ onClose }: { onClose: () => void }) {
           disabled={!canSubmit}
           onClick={() => {
             if (!canSubmit) return
-            addPoll(question, options)
+            addPoll(question, options, note)
             onClose()
           }}
         >
@@ -632,7 +600,7 @@ function CreatePollDialog({ onClose }: { onClose: () => void }) {
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && canSubmit) {
-              addPoll(question, options)
+              addPoll(question, options, note)
               onClose()
             }
           }}
@@ -663,15 +631,24 @@ function CreatePollDialog({ onClose }: { onClose: () => void }) {
             ) : null}
           </div>
         ))}
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setOptions([...options, ''])}
-          disabled={options.length >= 6}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {t('Option')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setOptions([...options, ''])}
+            disabled={options.length >= 6}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('Option')}
+          </Button>
+        </div>
+        <Textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={t('Add a note…')}
+          aria-label={t('Note')}
+          className="min-h-[56px] text-[13px]"
+        />
       </div>
     </DialogShell>
   )
@@ -682,6 +659,7 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
   const participants = useRoomSessionStore((state) => state.participants)
   const [title, setTitle] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
+  const [note, setNote] = useState('')
 
   return (
     <DialogShell
@@ -695,7 +673,7 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
           disabled={!title.trim()}
           onClick={() => {
             if (!title.trim()) return
-            addTask(title, assigneeId || null)
+            addTask(title, assigneeId || null, note)
             onClose()
           }}
         >
@@ -709,7 +687,7 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && title.trim()) {
-              addTask(title, assigneeId || null)
+              addTask(title, assigneeId || null, note)
               onClose()
             }
           }}
@@ -731,6 +709,13 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
             </option>
           ))}
         </select>
+        <Textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={t('Add a note…')}
+          aria-label={t('Note')}
+          className="min-h-[56px] text-[13px]"
+        />
       </div>
     </DialogShell>
   )
@@ -739,6 +724,7 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
 function CreateTodoDialog({ onClose }: { onClose: () => void }) {
   const t = useT()
   const [text, setText] = useState('')
+  const [note, setNote] = useState('')
 
   return (
     <DialogShell
@@ -752,7 +738,7 @@ function CreateTodoDialog({ onClose }: { onClose: () => void }) {
           disabled={!text.trim()}
           onClick={() => {
             if (!text.trim()) return
-            addTodo(text)
+            addTodo(text, note)
             onClose()
           }}
         >
@@ -760,19 +746,28 @@ function CreateTodoDialog({ onClose }: { onClose: () => void }) {
         </Button>
       }
     >
-      <Input
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && text.trim()) {
-            addTodo(text)
-            onClose()
-          }
-        }}
-        placeholder={t('Add an item to the shared list…')}
-        aria-label={t('To-do item')}
-        className="h-9 text-[13px]"
-      />
+      <div className="space-y-2">
+        <Input
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && text.trim()) {
+              addTodo(text, note)
+              onClose()
+            }
+          }}
+          placeholder={t('Add an item to the shared list…')}
+          aria-label={t('To-do item')}
+          className="h-9 text-[13px]"
+        />
+        <Textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={t('Add a note…')}
+          aria-label={t('Note')}
+          className="min-h-[56px] text-[13px]"
+        />
+      </div>
     </DialogShell>
   )
 }
@@ -787,6 +782,7 @@ const TIMER_PRESETS = [
 function CreateTimerDialog({ onClose }: { onClose: () => void }) {
   const t = useT()
   const [minutes, setMinutes] = useState('5')
+  const [note, setNote] = useState('')
   const value = Number.parseFloat(minutes)
   const valid = Number.isFinite(value) && value > 0
 
@@ -802,7 +798,7 @@ function CreateTimerDialog({ onClose }: { onClose: () => void }) {
           disabled={!valid}
           onClick={() => {
             if (!valid) return
-            startTimer(Math.round(value * 60_000))
+            startTimer(Math.round(value * 60_000), note)
             onClose()
           }}
         >
@@ -831,6 +827,13 @@ function CreateTimerDialog({ onClose }: { onClose: () => void }) {
           options={TIMER_PRESETS}
           size="sm"
           className="w-full"
+        />
+        <Textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={t('Add a note…')}
+          aria-label={t('Note')}
+          className="min-h-[56px] text-[13px]"
         />
       </div>
     </DialogShell>

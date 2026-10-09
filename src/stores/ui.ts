@@ -7,20 +7,16 @@ export interface Toast extends ToastInput {
   createdAt: number
 }
 
-export type ActivitiesTab = 'polls' | 'tasks' | 'todos' | 'timer'
-
 interface UiState {
   toasts: Toast[]
   panel: RoomPanel | null
   modal: RoomModal | null
   shortcutsOpen: boolean
-  activitiesTab: ActivitiesTab
   pushToast: (toast: ToastInput) => string
   dismissToast: (id: string) => void
   setPanel: (panel: RoomPanel | null) => void
   setModal: (modal: RoomModal | null) => void
   setShortcutsOpen: (open: boolean) => void
-  setActivitiesTab: (tab: ActivitiesTab) => void
 }
 
 export const useUiStore = create<UiState>()((set, get) => ({
@@ -28,7 +24,6 @@ export const useUiStore = create<UiState>()((set, get) => ({
   panel: null,
   modal: null,
   shortcutsOpen: false,
-  activitiesTab: 'polls',
 
   pushToast: (toast) => {
     const id = generateId('toast')
@@ -49,8 +44,6 @@ export const useUiStore = create<UiState>()((set, get) => ({
   setModal: (modal) => set({ modal }),
 
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
-
-  setActivitiesTab: (tab) => set({ activitiesTab: tab, panel: 'activities' }),
 }))
 
 export function toast(input: ToastInput) {

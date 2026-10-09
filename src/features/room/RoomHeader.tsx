@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react'
 import {
-  AlarmClock,
-  BarChart3,
-  Clapperboard,
-  ClipboardList,
-  ListTodo,
   Lock,
   Maximize,
   Minimize,
@@ -20,20 +15,7 @@ import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
 import { ConnectionRadar } from '@/features/room/ConnectionRadar'
-
-interface ActivityIcon {
-  key: string
-  icon: 'timer' | 'poll' | 'task' | 'todo'
-  mine: boolean
-}
-
-function ActivityIconGlyph({ type, mine }: { type: ActivityIcon['icon']; mine: boolean }) {
-  const cls = mine ? 'h-3.5 w-3.5 text-accent' : 'h-3.5 w-3.5 text-ink-subtle'
-  if (type === 'timer') return <AlarmClock className={cls} />
-  if (type === 'poll') return <BarChart3 className={cls} />
-  if (type === 'task') return <ClipboardList className={cls} />
-  return <ListTodo className={cls} />
-}
+import { ActivityBar } from '@/features/room/activities/ActivityBar'
 
 export function RoomHeader() {
   const t = useT()
@@ -41,11 +23,6 @@ export function RoomHeader() {
   const room = useRoomSessionStore((state) => state.room)
   const self = useRoomSessionStore((state) => state.self)
   const participantCount = useRoomSessionStore((state) => state.participants.length)
-  const polls = useRoomSessionStore((state) => state.polls)
-  const tasks = useRoomSessionStore((state) => state.tasks)
-  const todos = useRoomSessionStore((state) => state.todos)
-  const timer = useRoomSessionStore((state) => state.timer)
-  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const setPanel = useUiStore((state) => state.setPanel)
   const setModal = useUiStore((state) => state.setModal)
 
@@ -71,15 +48,6 @@ export function RoomHeader() {
 
   if (!room) return null
   const isHost = self?.role === 'host'
-
-  const activityIcons: ActivityIcon[] = []
-  if (timer) activityIcons.push({ key: 'timer', icon: 'timer', mine: false })
-  for (const poll of polls) activityIcons.push({ key: `poll-${poll.id}`, icon: 'poll', mine: false })
-  for (const task of tasks)
-    activityIcons.push({ key: `task-${task.id}`, icon: 'task', mine: Boolean(self && task.assigneeId === self.id) })
-  for (const todo of todos) activityIcons.push({ key: `todo-${todo.id}`, icon: 'todo', mine: false })
-  const visibleIcons = activityIcons.slice(0, 9)
-  const hiddenCount = activityIcons.length - visibleIcons.length
 
   return (
     <header className="relative z-20 flex h-14 shrink-0 items-center gap-2.5 border-b border-line bg-surface/85 px-3 backdrop-blur sm:px-4">
@@ -111,44 +79,7 @@ export function RoomHeader() {
       <div className="ml-auto flex items-center gap-1.5">
         <ConnectionRadar className="hidden sm:inline-flex" />
 
-        <button
-          type="button"
-          onClick={() => setPanel('activities')}
-          aria-label={
-            activityIcons.length > 0
-              ? t('{count} activities', { count: activityIcons.length })
-              : t('Activities')
-          }
-          title={
-            activityIcons.length > 0
-              ? t('{count} activities', { count: activityIcons.length })
-              : t('Activities')
-          }
-          className="relative flex h-9 items-center gap-1 rounded-lg border border-line bg-surface-2 px-2 text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
-        >
-          {activityIcons.length === 0 ? (
-            <span className="grid gap-0.5">
-              <Clapperboard className="h-4 w-4 text-ink-subtle" />
-            </span>
-          ) : (
-            <span className="flex items-center gap-[3px]">
-              {visibleIcons.map((entry) => (
-                <span
-                  key={entry.key}
-                  className={entry.mine ? 'grid h-5 w-5 place-items-center rounded-md bg-accent/15' : 'grid place-items-center'}
-                >
-                  <ActivityIconGlyph type={entry.icon} mine={entry.mine} />
-                </span>
-              ))}
-              {hiddenCount > 0 ? (
-                <span className="pl-0.5 font-mono text-[10.5px] text-ink-subtle">+{hiddenCount}</span>
-              ) : null}
-            </span>
-          )}
-          {activitiesUnread > 0 ? (
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger-solid ring-2 ring-surface" aria-hidden />
-          ) : null}
-        </button>
+        <ActivityBar />
 
         {fullscreenSupported ? (
           <button

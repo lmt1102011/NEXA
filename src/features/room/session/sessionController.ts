@@ -866,7 +866,7 @@ function canEditActivity(self: Participant, createdBy: ID) {
   return self.role === 'host' || Boolean(self.permissions?.canModerate) || self.id === createdBy
 }
 
-export function addPoll(question: string, optionTexts: string[]) {
+export function addPoll(question: string, optionTexts: string[], note = '') {
   const state = store()
   const self = state.self
   if (!self) return
@@ -876,6 +876,7 @@ export function addPoll(question: string, optionTexts: string[]) {
   const poll: Poll = {
     id: generateId('poll'),
     question: trimmedQuestion,
+    note: note.trim(),
     options: texts.map((text) => ({ id: generateId('opt'), text, votes: [] })),
     createdBy: self.id,
     createdAt: Date.now(),
@@ -928,14 +929,14 @@ export function deletePoll(pollId: ID) {
   publishActivities(activities)
 }
 
-export function addTask(title: string, assigneeId: ID | null = null) {
+export function addTask(title: string, assigneeId: ID | null = null, note = '') {
   const state = store()
   const self = state.self
   if (!self || !title.trim()) return
   const task: ActivityTask = {
     id: generateId('task'),
     title: title.trim(),
-    note: '',
+    note: note.trim(),
     assigneeId,
     done: false,
     createdBy: self.id,
@@ -987,13 +988,14 @@ export function deleteTask(taskId: ID) {
   publishActivities(activities)
 }
 
-export function addTodo(text: string) {
+export function addTodo(text: string, note = '') {
   const state = store()
   const self = state.self
   if (!self || !text.trim()) return
   const item: TodoItem = {
     id: generateId('todo'),
     text: text.trim(),
+    note: note.trim(),
     done: false,
     createdBy: self.id,
     createdAt: Date.now(),
@@ -1023,7 +1025,7 @@ export function deleteTodo(todoId: ID) {
   publishActivities(activities)
 }
 
-export function startTimer(durationMs: number) {
+export function startTimer(durationMs: number, note = '') {
   const state = store()
   const self = state.self
   if (!self || durationMs <= 0) return
@@ -1032,6 +1034,7 @@ export function startTimer(durationMs: number) {
     remainingMs: durationMs,
     running: true,
     startedBy: self.id,
+    note: note.trim(),
   }
   const activities = { ...currentActivities(), timer }
   state.setActivities(activities)

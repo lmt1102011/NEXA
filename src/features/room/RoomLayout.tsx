@@ -29,7 +29,6 @@ import type { RoomPanel as RoomPanelKey } from '@/types'
 const PANEL_TITLES: Record<RoomPanelKey, string> = {
   chat: t('Chat'),
   participants: t('Participants'),
-  activities: t('Activities'),
   settings: t('Room settings'),
 }
 

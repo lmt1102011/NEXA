@@ -152,6 +152,7 @@ export interface PollOption {
 export interface Poll {
   id: ID
   question: string
+  note: string
   options: PollOption[]
   createdBy: ID
   createdAt: number
@@ -171,6 +172,7 @@ export interface ActivityTask {
 export interface TodoItem {
   id: ID
   text: string
+  note: string
   done: boolean
   createdBy: ID
   createdAt: number
@@ -181,6 +183,7 @@ export interface RoomTimer {
   remainingMs: number
   running: boolean
   startedBy: ID | null
+  note: string
 }
 
 export interface DeviceOption {
@@ -195,7 +198,7 @@ export interface ToastInput {
   duration?: number
 }
 
-export type RoomPanel = 'chat' | 'participants' | 'activities' | 'settings'
+export type RoomPanel = 'chat' | 'participants' | 'settings'
 export type RoomModal = 'invite' | 'shortcuts' | 'devices' | 'leave' | 'more'
 
 export type SessionStatus =
