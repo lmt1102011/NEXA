@@ -12,7 +12,7 @@ import { roomFromInviteParams } from '@/lib/invite'
 import { initRoom, markEnteredViaRoomLink, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
 import { RoomHeader } from '@/features/room/RoomHeader'
 import { NameConflictBar } from '@/features/room/NameConflictBar'
-import { useTimerAlert } from '@/features/room/activities/useTimerAlert'
+import { TimeUpOverlay } from '@/features/room/activities/TimeUpOverlay'
 import { RoomPanel } from '@/features/room/RoomPanel'
 import RoomStage from '@/features/room/RoomStage'
 import { ControlBar } from '@/features/room/ControlBar'
@@ -98,7 +98,6 @@ export default function RoomLayout() {
   }, [roomId, searchParams.toString()])
 
   useConnectionMonitor(status === 'joined')
-  useTimerAlert()
 
   useEffect(() => {
     if (status === 'joined') return
@@ -154,6 +153,7 @@ export default function RoomLayout() {
       <ShortcutsDialog />
       <LeaveDialog />
       <MoreSheet />
+      <TimeUpOverlay />
 
       {isMobile && panel ? (
         <Sheet

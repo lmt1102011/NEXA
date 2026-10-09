@@ -63,7 +63,7 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   'Activity type': 'Loại hoạt động',
   Polls: 'Bình chọn',
   Tasks: 'Việc',
-  'To-do': 'Cần làm',
+  'To-do': 'Todo list',
   Timer: 'Hẹn giờ',
   'Call controls': 'Điều khiển cuộc gọi',
   'Low bandwidth mode': 'Chế độ tiết kiệm dữ liệu',

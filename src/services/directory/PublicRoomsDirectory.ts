@@ -85,7 +85,6 @@ export function startPublicRoomsDirectory() {
       .getState()
       .rooms.filter(
         (room) =>
-          room.visibility === 'public' &&
           room.status === 'live' &&
           room.hostId === useSessionStore.getState().userId,
       )
@@ -100,7 +99,6 @@ export function startPublicRoomsDirectory() {
       .getState()
       .rooms.filter(
         (room) =>
-          room.visibility === 'public' &&
           room.status === 'live' &&
           room.hostId === useSessionStore.getState().userId,
       )

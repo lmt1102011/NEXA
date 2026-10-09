@@ -93,7 +93,18 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Add an activity': 'Thêm một hoạt động',
   'Poll': 'Bình chọn',
   'Task': 'Công việc',
-  'To-do': 'Việc cần làm',
+  'Timer': 'Hẹn giờ',
+  'Todo list': 'Todo list',
+  'To-do': 'Todo list',
+  'Active': 'Đang chạy',
+  'Cancel': 'Hủy',
+  'New poll': 'Bình chọn mới',
+  'New task': 'Công việc mới',
+  'New to-do': 'Mục todo mới',
+  'New timer': 'Hẹn giờ mới',
+  'Add activity': 'Thêm hoạt động',
+  '{count} activities': '{count} hoạt động',
+  'No activities yet': 'Chưa có hoạt động',
   'Activities are shared live with everyone in the room.': 'Hoạt động được chia sẻ trực tiếp cho mọi người trong phòng.',
   '{count} tasks': '{count} công việc',
   '{count} to-dos': '{count} việc cần làm',
@@ -101,6 +112,22 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Poll ended': 'Đã kết thúc bình chọn',
   'Vote {option}': 'Bình chọn {option}',
   'Results': 'Kết quả',
+
+  // ---- per-participant volume ----
+  'Volume': 'Âm lượng',
+  'Adjust volume for {name}': 'Chỉnh âm lượng cho {name}',
+  'Muted': 'Đã tắt tiếng',
+
+  // ---- fullscreen ----
+  'Fullscreen': 'Toàn màn hình',
+  'Exit fullscreen': 'Thoát toàn màn hình',
+
+  // ---- timer finished ----
+  "Time's up!": 'Hết giờ!',
+  "Time's up — {name}'s countdown is over.": 'Hết giờ — hẹn giờ của {name} đã kết thúc.',
+  'The countdown is over.': 'Đếm ngược đã kết thúc.',
+  '+1 minute': '+1 phút',
+  'Got it': 'Đã rõ',
 
   // ---- chat: copy / pin ----
   'Copy': 'Sao chép',

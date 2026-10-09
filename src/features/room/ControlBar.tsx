@@ -1,7 +1,6 @@
 import {
   Camera,
   CameraOff,
-  Clapperboard,
   Ellipsis,
   Keyboard,
   MessageSquare,
@@ -112,7 +111,6 @@ function MobileControl({ item }: { item: ControlItem }) {
         {item.icon}
         <BadgeCount item={item} ringClass="-right-2.5 -top-2 ring-surface" />
       </span>
-      <span className="max-w-full truncate text-[9.5px] font-medium leading-none">{item.label}</span>
     </button>
   )
 }
@@ -133,7 +131,6 @@ export function ControlBar() {
   const videoPermission = useCallStore((state) => state.videoPermission)
 
   const unread = useRoomSessionStore((state) => state.unread)
-  const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const requests = useRoomSessionStore((state) => state.requests.length)
   const self = useRoomSessionStore((state) => state.self)
   const room = useRoomSessionStore((state) => state.room)
@@ -183,15 +180,6 @@ export function ControlBar() {
       shortcut: 'C',
       ariaLabel: t('Open chat'),
       onClick: () => setPanel('chat'),
-    },
-    {
-      key: 'activities',
-      icon: <Clapperboard className="h-[18px] w-[18px]" />,
-      label: t('Activities'),
-      active: panel === 'activities',
-      dot: activitiesUnread > 0 && panel !== 'activities',
-      ariaLabel: t('Open room activities'),
-      onClick: () => setPanel('activities'),
     },
     { key: 'divider-2', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {
@@ -269,7 +257,7 @@ export function ControlBar() {
           ))}
         <span className="mx-1 h-7 w-px bg-line" aria-hidden />
         {items
-          .filter((item) => ['chat', 'activities'].includes(item.key))
+          .filter((item) => ['chat'].includes(item.key))
           .map((item) => (
             <DesktopControl key={item.key} item={item} />
           ))}

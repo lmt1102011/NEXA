@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff } from 'lucide-react'
+import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff, VolumeX, Volume1, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { Avatar } from '@/components/ui/avatar'
@@ -12,9 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Slider } from '@/components/ui/slider'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
+import { useVolumesStore } from '@/stores/volumes'
 import { hostDisableCamera, hostMuteParticipant, hostRemoveParticipant } from '@/features/room/session/sessionController'
 import type { Participant } from '@/types'
 
@@ -38,6 +41,8 @@ export const VideoTile = memo(function VideoTile({
   const remoteStream = useCallStore((state) =>
     !isSelf && participant.peerId ? state.remoteStreams[participant.peerId] : undefined,
   )
+  const volume = useVolumesStore((state) => state.volumes[participant.id] ?? 100)
+  const setVolume = useVolumesStore((state) => state.setVolume)
 
   const showLocalVideo = isSelf && participant.cameraOn && hasLocalVideo
   const remoteHasLiveVideo = Boolean(
@@ -68,9 +73,10 @@ export const VideoTile = memo(function VideoTile({
     const audio = remoteAudioRef.current
     if (audio) {
       audio.srcObject = remoteStream
+      audio.volume = Math.min(1, volume / 100)
       void audio.play().catch(() => undefined)
     }
-  }, [remoteStream, showRemoteVideo])
+  }, [remoteStream, showRemoteVideo, volume])
 
   const hasLiveMedia = showLocalVideo || showRemoteVideo
 
@@ -124,6 +130,61 @@ export const VideoTile = memo(function VideoTile({
 
       {!isSelf && remoteStream ? (
         <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+      ) : null}
+
+      {!isSelf && remoteStream ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={t('Adjust volume for {name}', { name: participant.name })}
+              className={cn(
+                'absolute z-10 grid place-items-center rounded-lg bg-black/45 text-white/85 backdrop-blur-sm transition-colors hover:bg-black/65 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                compact ? 'bottom-1.5 right-1.5 h-6 w-6' : 'bottom-2 right-2 h-7 w-7',
+              )}
+            >
+              {volume <= 0 ? (
+                <VolumeX className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+              ) : volume < 100 ? (
+                <Volume1 className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+              ) : (
+                <Volume2 className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" sideOffset={6} className="w-48 p-3">
+            <div className="space-y-2.5">
+              <p className="flex items-center justify-between gap-2 text-[12.5px] font-medium text-ink">
+                {t('Adjust volume for {name}', { name: participant.name })}
+                <span className="font-mono text-ink-subtle">{volume}%</span>
+              </p>
+              <Slider
+                min={0}
+                max={150}
+                step={5}
+                value={[volume]}
+                onValueChange={(value) => setVolume(participant.id, value[0] ?? 100)}
+                aria-label={t('Volume')}
+              />
+              <div className="flex justify-between text-[10.5px] text-ink-subtle">
+                <button
+                  type="button"
+                  onClick={() => setVolume(participant.id, 0)}
+                  className="rounded px-1 py-0.5 transition-colors hover:bg-surface-3 hover:text-ink"
+                >
+                  {t('Mute')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVolume(participant.id, 100)}
+                  className="rounded px-1 py-0.5 transition-colors hover:bg-surface-3 hover:text-ink"
+                >
+                  {t('Reset')}
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       ) : null}
 
       <div

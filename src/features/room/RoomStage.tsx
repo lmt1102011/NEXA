@@ -12,7 +12,6 @@ import { useUiStore } from '@/stores/ui'
 import { acceptRequest, rejectRequest } from '@/features/room/session/sessionController'
 import { VideoGrid } from '@/features/room/VideoGrid'
 import { VideoTile } from '@/features/room/VideoTile'
-import { ActivityDock } from '@/features/room/activities/ActivityDock'
 import type { Participant } from '@/types'
 
 export default function RoomStage() {
@@ -62,7 +61,6 @@ export default function RoomStage() {
       style={stageStyle}
     >
       {presenter ? <SharingLayout presenter={presenter} participants={participants} /> : <VideoGrid participants={participants} />}
-      <ActivityDock />
       <JoinRequestBanner />
     </div>
   )
