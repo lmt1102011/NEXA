@@ -8,6 +8,7 @@ import { LiveDot } from '@/components/ui/badge'
 import { useT } from '@/lib/i18n'
 import { usePublicRooms } from '@/features/rooms/usePublicRooms'
 import { RoomCard, RoomCardSkeleton } from '@/features/rooms/RoomCard'
+import nexaLogo from '@/assets/brand/nexa-logo.svg'
 
 const heroMotion = {
   hidden: { opacity: 0, y: 18 },
@@ -71,7 +72,7 @@ export default function HomePage() {
             <motion.img
               variants={heroMotion}
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              src="/brand/nexa-logo.svg"
+              src={nexaLogo}
               alt="NEXA Call"
               draggable={false}
               width={811}
