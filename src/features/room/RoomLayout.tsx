@@ -45,15 +45,55 @@ export default function RoomLayout() {
   const { isMobile } = useBreakpoint()
 
   useEffect(() => {
-    if (roomId && !useRoomsStore.getState().findRoom(roomId)) {
+    if (!roomId) return
+    let started = false
+    let cleanup: () => void = () => {}
+    let unsub: (() => void) | null = null
+    let timer: number | null = null
+
+    const tryInit = () => {
+      if (started) return
+      const existing = useRoomsStore.getState().findRoom(roomId)
+      if (existing) {
+        started = true
+        cleanup = initRoom(roomId)
+        return
+      }
       const invited = roomFromInviteParams(roomId, searchParams)
       const remote = invited ?? useDirectoryStore.getState().findRoom(roomId)
       if (remote) {
         useRoomsStore.getState().addRoom(remote)
         markEnteredViaRoomLink()
+        started = true
+        cleanup = initRoom(roomId)
       }
     }
-    return initRoom(roomId)
+
+    tryInit()
+    if (!started) {
+      // The shared directory syncs rooms over the realtime channel, so a room
+      // pasted as a bare link may not be known yet on this device. Watch the
+      // directory (with a polling fallback) and start the session the moment
+      // the room appears instead of showing "Room not found" forever.
+      unsub = useDirectoryStore.subscribe(() => tryInit())
+      let retries = 0
+      timer = window.setInterval(() => {
+        retries += 1
+        if (useDirectoryStore.getState().findRoom(roomId)) {
+          tryInit()
+        } else if (retries >= 6) {
+          // the room never arrived — land on the not-found status screen
+          started = true
+          cleanup = initRoom(roomId)
+        }
+      }, 2000)
+    }
+
+    return () => {
+      cleanup()
+      unsub?.()
+      if (timer !== null) window.clearInterval(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, searchParams.toString()])
 

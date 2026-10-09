@@ -102,6 +102,9 @@ export function initRoom(roomId: ID): () => void {
   offRemoteStream = realtime.onRemoteStream(handleRemoteStream)
 
   if (status === 'joined') {
+    useRoomsStore.getState().updateMeta(roomId, {
+      participantCount: store().participants.length,
+    })
     connectAsSelf()
     realtime.announce()
     wireSelfMedia()
@@ -134,7 +137,21 @@ function connectAsSelf() {
 function handlePageHide() {
   const self = store().self
   if (self) realtime?.emit({ type: 'peer-leave', participantId: self.id })
+  if (activeRoomId) decParticipantCount(activeRoomId)
   realtime?.disconnect()
+}
+
+/**
+ * Best-effort local bookkeeping: assumes this device no longer counts toward
+ * a room's participant count. Closing the tab without leaving the room kills
+ * the live session instantly, so no peer can update the persisted room meta
+ * for us — without this the room would keep showing our account forever.
+ */
+function decParticipantCount(roomId: ID) {
+  const rooms = useRoomsStore.getState()
+  const room = rooms.rooms.find((existing) => existing.id === roomId)
+  if (!room) return
+  rooms.updateMeta(roomId, { participantCount: Math.max(0, room.participantCount - 1) })
 }
 
 function cleanupTransport() {
@@ -162,6 +179,7 @@ function stopLocalMedia() {
 function fullTeardown() {
   if (requestRetryTimer !== null) window.clearInterval(requestRetryTimer)
   requestRetryTimer = null
+  if (activeRoomId && store().self) decParticipantCount(activeRoomId)
   stopLocalMedia()
   joinApproved = false
   store().reset()

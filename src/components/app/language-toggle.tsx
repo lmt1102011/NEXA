@@ -13,7 +13,7 @@ export function LanguageToggle({ className }: { className?: string }) {
       aria-label={t('Change language')}
       title={t('Language')}
       className={
-        'inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink ' +
+        'inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-semibold text-ink shadow-sm transition-colors hover:border-ink/20 hover:bg-surface-2 hover:text-ink ' +
         (className ?? '')
       }
     >
