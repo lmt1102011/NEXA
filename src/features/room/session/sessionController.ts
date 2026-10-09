@@ -19,6 +19,7 @@ import { qualityController } from '@/services/media/QualityController'
 import { announceRoomDeletion } from '@/services/directory/PublicRoomsDirectory'
 import { buildFileMessage, buildSystemMessage, buildTextMessage } from '@/lib/chat'
 import { generateId } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore, buildSelfParticipant } from '@/stores/roomSession'
 import { useRoomsStore } from '@/stores/rooms'
@@ -318,8 +319,8 @@ async function prepareMedia(audio: boolean, camera: boolean, silent: boolean) {
       mediaEngine.setMic(micReady)
       if (!micReady && !silent) {
         notify({
-          title: result.audio === 'denied' ? 'Microphone access denied' : 'No microphone found',
-          description: 'You can still watch and chat in this room.',
+          title: result.audio === 'denied' ? t('Microphone access denied') : t('No microphone found'),
+          description: t('You can still watch and chat in this room.'),
           variant: 'warning',
         })
       }
@@ -331,8 +332,8 @@ async function prepareMedia(audio: boolean, camera: boolean, silent: boolean) {
       mediaEngine.setCamera(camReady)
       if (!camReady && !silent) {
         notify({
-          title: result.video === 'denied' ? 'Camera access denied' : 'No camera found',
-          description: 'You can still join with audio only.',
+          title: result.video === 'denied' ? t('Camera access denied') : t('No camera found'),
+          description: t('You can still join with audio only.'),
           variant: 'warning',
         })
       }
@@ -404,8 +405,8 @@ export function renameSelf(name: string): boolean {
   if (clash) {
     s.setNameTaken(clash)
     notify({
-      title: 'Name is already taken',
-      description: `“${clash}” is used by someone else here. Pick a different name.`,
+      title: t('Name is already taken'),
+      description: t('“{name}” is used by someone else here. Pick a different name.', { name: clash }),
       variant: 'danger',
       duration: 5000,
     })
@@ -469,8 +470,8 @@ function handleRealtimeEvent(event: RoomEvent) {
         const promoted = patch.role === 'host' && state.self.role !== 'host'
         const grantedPermissions = patch.permissions !== undefined && !state.self.permissions
         state.setSelf({ ...state.self, ...patch, isSelf: true })
-        if (promoted) notify({ title: 'You are now the host of this room', variant: 'success' })
-        if (grantedPermissions) notify({ title: 'The host granted you new permissions', variant: 'success', duration: 4000 })
+        if (promoted) notify({ title: t('You are now the host of this room'), variant: 'success' })
+        if (grantedPermissions) notify({ title: t('The host granted you new permissions'), variant: 'success', duration: 4000 })
         break
       }
       touchParticipant(event.participantId)
@@ -508,7 +509,7 @@ function handleRealtimeEvent(event: RoomEvent) {
         timer: event.timer,
       })
       if (selfAssigned.length > 0) {
-        notify({ title: `New task assigned to you: “${selfAssigned[0].title}”`, variant: 'info', duration: 5000 })
+        notify({ title: t('New task assigned to you: "{title}"', { title: selfAssigned[0].title }), variant: 'info', duration: 5000 })
       }
       if (selfAssigned.length > 0 || pollsGrew) state.bumpActivitiesUnread()
       break
@@ -533,8 +534,8 @@ function handleRealtimeEvent(event: RoomEvent) {
       }
       state.addRequest(event.request)
       notify({
-        title: `${event.request.name} wants to join`,
-        description: 'Open Participants to review the request.',
+        title: t('{name} wants to join', { name: event.request.name }),
+        description: t('Open Participants to review the request.'),
         variant: 'info',
         duration: 6000,
       })
@@ -550,7 +551,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       state.applySettingsPatch(event.patch)
       if (event.patch.access?.lockRoom !== undefined) {
         state.addMessage(
-          buildSystemMessage(activeRoomId ?? '', event.patch.access.lockRoom ? 'Room was locked' : 'Room was unlocked'),
+          buildSystemMessage(activeRoomId ?? '', event.patch.access.lockRoom ? t('Room was locked') : t('Room was unlocked')),
         )
       }
       break
@@ -570,8 +571,8 @@ function handleRealtimeEvent(event: RoomEvent) {
       if (state.nameTaken && normalizeName(state.nameTaken) === normalizeName(event.name)) break
       state.setNameTaken(event.name)
       notify({
-        title: 'Name is already taken',
-        description: `“${event.name}” belongs to someone else here. Choose another name to join.`,
+        title: t('Name is already taken'),
+        description: t('“{name}” belongs to someone else here. Choose another name to join.', { name: event.name }),
         variant: 'danger',
         duration: 6000,
       })
@@ -695,7 +696,7 @@ export function acceptRequest(requestId: ID) {
   }
   state.addParticipant(participant)
   realtime?.emit({ type: 'request-resolved', requestId, participantId: request.participantId, accepted: true })
-  notify({ title: `${request.name} joined the room`, variant: 'success', duration: 2600 })
+      notify({ title: t('{name} joined the room', { name: request.name }), variant: 'success', duration: 2600 })
 }
 
 export function rejectRequest(requestId: ID) {
@@ -718,7 +719,7 @@ export function sendChatMessage(text: string) {
   const state = store()
   if (!state.room || !state.self) return
   if (!state.room.settings.chat.enabled) {
-    notify({ title: 'Chat is disabled in this room', variant: 'warning' })
+    notify({ title: t('Chat is disabled in this room'), variant: 'warning' })
     return
   }
   const message = buildTextMessage({
@@ -736,13 +737,13 @@ export async function sendFileMessage(file: File) {
   const state = store()
   if (!state.room || !state.self) return
   if (!state.room.settings.chat.enabled || !state.room.settings.chat.allowFiles) {
-    notify({ title: 'File sharing is disabled in this room', variant: 'warning' })
+    notify({ title: t('File sharing is disabled in this room'), variant: 'warning' })
     return
   }
   if (file.size > MAX_FILE_SIZE) {
     notify({
-      title: 'File is too large',
-      description: 'Maximum file size is 2 MB in peer-to-peer chat.',
+      title: t('File is too large'),
+      description: t('Maximum file size is 2 MB in peer-to-peer chat.'),
       variant: 'danger',
     })
     return
@@ -752,7 +753,7 @@ export async function sendFileMessage(file: File) {
   try {
     dataUrl = await readFileAsDataURL(file)
   } catch {
-    notify({ title: 'Could not read this file', variant: 'danger' })
+    notify({ title: t('Could not read this file'), variant: 'danger' })
     return
   }
 
@@ -1029,8 +1030,8 @@ export async function toggleMic() {
   const current = useCallStore.getState()
   if (current.audioPermission !== 'granted' || !mediaEngine.hasAudioTrack()) {
     notify({
-      title: 'No microphone available',
-      description: 'Check your device settings and browser permissions.',
+      title: t('No microphone available'),
+      description: t('Check your device settings and browser permissions.'),
       variant: 'warning',
     })
     return
@@ -1049,8 +1050,8 @@ export async function toggleCamera() {
   const current = useCallStore.getState()
   if (current.videoPermission !== 'granted' || !mediaEngine.hasVideoTrack()) {
     notify({
-      title: 'No camera available',
-      description: 'Check your device settings and browser permissions.',
+      title: t('No camera available'),
+      description: t('Check your device settings and browser permissions.'),
       variant: 'warning',
     })
     return
@@ -1069,11 +1070,11 @@ export async function toggleScreenShare() {
   if (!room || !self) return
 
   if (!room.settings.screenShare.allow) {
-    notify({ title: 'Screen sharing is disabled by the host', variant: 'warning' })
+    notify({ title: t('Screen sharing is disabled by the host'), variant: 'warning' })
     return
   }
   if (self.role !== 'host' && !self.permissions?.canShareScreen && !room.settings.screenShare.allowParticipants) {
-    notify({ title: 'Only the host can share their screen', variant: 'warning' })
+    notify({ title: t('Only the host can share their screen'), variant: 'warning' })
     return
   }
 
@@ -1171,7 +1172,7 @@ export function hostMuteParticipant(participantId: ID) {
   if (!target || target.role === 'host') return
   state.updateParticipant(participantId, { micOn: false })
   realtime?.emit({ type: 'peer-update', participantId, patch: { micOn: false } })
-  notify({ title: `Muted ${target.name}`, duration: 2200 })
+  notify({ title: t('Muted {name}', { name: target.name }), duration: 2200 })
 }
 
 export function hostDisableCamera(participantId: ID) {
@@ -1181,7 +1182,7 @@ export function hostDisableCamera(participantId: ID) {
   if (!target || target.role === 'host') return
   state.updateParticipant(participantId, { cameraOn: false })
   realtime?.emit({ type: 'peer-update', participantId, patch: { cameraOn: false } })
-  notify({ title: `Turned off ${target.name}'s camera`, duration: 2200 })
+  notify({ title: t("Turned off {name}'s camera", { name: target.name }), duration: 2200 })
 }
 
 export function hostRemoveParticipant(participantId: ID) {
@@ -1191,8 +1192,8 @@ export function hostRemoveParticipant(participantId: ID) {
   if (!target || target.role === 'host') return
   state.removeParticipant(participantId)
   realtime?.emit({ type: 'kick', participantId })
-  state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} was removed by the host`))
-  notify({ title: `Removed ${target.name}`, duration: 2600 })
+  state.addMessage(buildSystemMessage(state.room?.id ?? '', t('{name} was removed by the host', { name: target.name })))
+  notify({ title: t('Removed {name}', { name: target.name }), duration: 2600 })
 }
 
 export function hostTransferHost(participantId: ID) {
@@ -1206,8 +1207,8 @@ export function hostTransferHost(participantId: ID) {
   state.updateParticipant(target.id, { role: 'host' })
   realtime?.emit({ type: 'peer-update', participantId: self.id, patch: { role: 'guest' } })
   realtime?.emit({ type: 'peer-update', participantId: target.id, patch: { role: 'host' } })
-  state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} is now the host`))
-  notify({ title: `Host transferred to ${target.name}`, variant: 'success' })
+  state.addMessage(buildSystemMessage(state.room?.id ?? '', t('{name} is now the host', { name: target.name })))
+  notify({ title: t('Host transferred to {name}', { name: target.name }), variant: 'success' })
 }
 
 /**
@@ -1223,7 +1224,7 @@ export function hostLeaveWithDelegate(participantId: ID, note?: string) {
   if (target && target.id !== self.id) {
     state.updateParticipant(target.id, { role: 'host' })
     realtime?.emit({ type: 'peer-update', participantId: target.id, patch: { role: 'host' } })
-    state.addMessage(buildSystemMessage(state.room?.id ?? '', `${target.name} is now the host of this room`))
+    state.addMessage(buildSystemMessage(state.room?.id ?? '', t('{name} is now the host of this room', { name: target.name })))
   }
   if (note && note.trim()) {
     state.addMessage(buildSystemMessage(state.room?.id ?? '', note.trim()))
@@ -1250,7 +1251,7 @@ export function hostToggleLock(locked: boolean) {
   if (!self || (self.role !== 'host' && !self.permissions?.canManageRoom)) return
   applyHostSettings({ access: { lockRoom: locked } })
   if (state.room) {
-    state.addMessage(buildSystemMessage(state.room.id, locked ? 'Room was locked' : 'Room was unlocked'))
+    state.addMessage(buildSystemMessage(state.room.id, locked ? t('Room was locked') : t('Room was unlocked')))
   }
 }
 

@@ -14,6 +14,7 @@ import { SelectField } from '@/components/ui/select'
 import { ToggleRow } from '@/components/ui/switch'
 import { Segmented } from '@/components/ui/segmented'
 import { mediaEngine } from '@/services/media/MediaEngine'
+import { useT } from '@/lib/i18n'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
@@ -40,6 +41,7 @@ export function DeviceSettingsDialog() {
   const videoPermission = useCallStore((state) => state.videoPermission)
   const micOn = useCallStore((state) => state.micOn)
   const cameraOn = useCallStore((state) => state.cameraOn)
+  const t = useT()
 
   const [noiseFilter, setNoiseFilter] = useState<NoiseFilter>(room?.settings.av.noiseFilter ?? 'light')
   const [echoCancellation, setEchoCancellation] = useState(room?.settings.av.echoCancellation ?? true)
@@ -62,15 +64,15 @@ export function DeviceSettingsDialog() {
   }, [modal, cameraOn, micOn])
 
   const micOptions = [
-    { value: '__default', label: 'System default microphone' },
+    { value: '__default', label: t('System default microphone') },
     ...devices.audio.map((device) => ({ value: device.deviceId, label: device.label })),
   ]
   const camOptions = [
-    { value: '__default', label: 'System default camera' },
+    { value: '__default', label: t('System default camera') },
     ...devices.video.map((device) => ({ value: device.deviceId, label: device.label })),
   ]
   const speakerOptions = [
-    { value: '__default', label: 'System default speaker' },
+    { value: '__default', label: t('System default speaker') },
     ...devices.output.map((device) => ({ value: device.deviceId, label: device.label })),
   ]
 
@@ -83,8 +85,8 @@ export function DeviceSettingsDialog() {
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Device settings</DialogTitle>
-          <DialogDescription>Preview and switch devices before or during the call.</DialogDescription>
+          <DialogTitle>{t('Device settings')}</DialogTitle>
+          <DialogDescription>{t('Preview and switch devices before or during the call.')}</DialogDescription>
         </DialogHeader>
 
         <DialogBody className="space-y-4 pb-4">
@@ -95,7 +97,7 @@ export function DeviceSettingsDialog() {
               <div className="absolute inset-0 grid place-items-center text-center">
                 <div>
                   <CameraOff className="mx-auto h-6 w-6 text-ink-subtle" />
-                  <p className="mt-2 text-[12.5px] text-ink-subtle">Camera is off</p>
+                  <p className="mt-2 text-[12.5px] text-ink-subtle">{t('Camera is off')}</p>
                 </div>
               </div>
             )}
@@ -107,17 +109,17 @@ export function DeviceSettingsDialog() {
                     : 'h-2 w-2 rounded-full bg-white/50'
                 }
               />
-              {voiceDetected ? 'Voice detected' : 'Mic ready'}
+              {voiceDetected ? t('Voice detected') : t('Mic ready')}
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <span className="mb-1.5 block text-[13px] font-medium text-ink-muted">Microphone</span>
+              <span className="mb-1.5 block text-[13px] font-medium text-ink-muted">{t('Microphone')}</span>
               <SelectField
                 value={activeAudioId || '__default'}
                 options={micOptions}
-                ariaLabel="Microphone"
+                ariaLabel={t('Microphone')}
                 disabled={audioPermission !== 'granted'}
                 onChange={(value) => {
                   if (value !== '__default') void switchDevice('audio', value)
@@ -125,11 +127,11 @@ export function DeviceSettingsDialog() {
               />
             </div>
             <div>
-              <span className="mb-1.5 block text-[13px] font-medium text-ink-muted">Camera</span>
+              <span className="mb-1.5 block text-[13px] font-medium text-ink-muted">{t('Camera')}</span>
               <SelectField
                 value={activeVideoId || '__default'}
                 options={camOptions}
-                ariaLabel="Camera"
+                ariaLabel={t('Camera')}
                 disabled={videoPermission !== 'granted'}
                 onChange={(value) => {
                   if (value !== '__default') void switchDevice('video', value)
@@ -139,11 +141,11 @@ export function DeviceSettingsDialog() {
           </div>
 
           <div>
-            <span className="mb-1.5 block text-[13px] font-medium text-ink-muted">Speaker</span>
+            <span className="mb-1.5 block text-[13px] font-medium text-ink-muted">{t('Speaker')}</span>
             <SelectField
               value={activeOutputId || '__default'}
               options={speakerOptions}
-              ariaLabel="Speaker"
+              ariaLabel={t('Speaker')}
               onChange={(value) => {
                 if (value !== '__default') setActiveDevice('output', value)
               }}
@@ -152,23 +154,23 @@ export function DeviceSettingsDialog() {
 
           <div className="space-y-2 divide-y divide-[var(--nx-line)] rounded-xl border border-line bg-surface-2 px-3 py-2">
             <div className="space-y-1.5">
-              <span className="block pt-1 text-[13px] font-medium text-ink">Noise filter</span>
-              <span className="block text-[12px] text-ink-subtle">Reduces background noise from your mic.</span>
+              <span className="block pt-1 text-[13px] font-medium text-ink">{t('Noise filter')}</span>
+              <span className="block text-[12px] text-ink-subtle">{t('Reduces background noise from your mic.')}</span>
               <Segmented
-                ariaLabel="Noise filter"
+                ariaLabel={t('Noise filter')}
                 value={noiseFilter}
                 onChange={(value) => {
                   setNoiseFilter(value)
                   void applyLocalAudioPreferences({ noiseFilter: value, echoCancellation })
                 }}
-                options={NOISE_OPTIONS}
+                options={NOISE_OPTIONS.map((option) => ({ ...option, label: t(option.label) }))}
                 size="sm"
                 className="w-full"
               />
             </div>
             <ToggleRow
-              label="Echo cancellation"
-              description="Prevents speaker output from feeding back."
+              label={t('Echo cancellation')}
+              description={t('Prevents speaker output from feeding back.')}
               checked={echoCancellation}
               onCheckedChange={(value) => {
                 setEchoCancellation(value)
@@ -180,22 +182,22 @@ export function DeviceSettingsDialog() {
           <div className="flex items-center gap-3 text-[12.5px] text-ink-subtle">
             <span className="inline-flex items-center gap-1.5">
               {micOn ? <Mic className="h-3.5 w-3.5 text-success" /> : <MicOff className="h-3.5 w-3.5 text-danger" />}
-              {micOn ? 'Microphone on' : 'Microphone muted'}
+              {micOn ? t('Microphone on') : t('Microphone muted')}
             </span>
             <span className="inline-flex items-center gap-1.5">
               {cameraOn ? <Camera className="h-3.5 w-3.5 text-success" /> : <CameraOff className="h-3.5 w-3.5 text-danger" />}
-              {cameraOn ? 'Camera on' : 'Camera off'}
+              {cameraOn ? t('Camera on') : t('Camera off')}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Volume2 className="h-3.5 w-3.5" />
-              Speaker preview
+              {t('Speaker preview')}
             </span>
           </div>
         </DialogBody>
 
         <DialogFooter>
           <Button variant="secondary" onClick={() => setModal(null)}>
-            Done
+            {t('Done')}
           </Button>
         </DialogFooter>
       </DialogContent>

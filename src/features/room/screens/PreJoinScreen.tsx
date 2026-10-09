@@ -10,8 +10,10 @@ import { useSessionStore } from '@/stores/session'
 import { useCallStore } from '@/stores/call'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { preparePreview, requestJoin, switchDevice, toggleCamera, toggleMic, nameTakenBy } from '@/features/room/session/sessionController'
+import { useT } from '@/lib/i18n'
 
 export default function PreJoinScreen() {
+  const t = useT()
   const navigate = useNavigate()
   const room = useRoomSessionStore((state) => state.room)
   const nameTaken = useRoomSessionStore((state) => state.nameTaken)
@@ -91,11 +93,11 @@ export default function PreJoinScreen() {
   }
 
   const micOptions = [
-    { value: '__default', label: 'System default microphone' },
+    { value: '__default', label: t('System default microphone') },
     ...devices.audio.map((device) => ({ value: device.deviceId, label: device.label })),
   ]
   const camOptions = [
-    { value: '__default', label: 'System default camera' },
+    { value: '__default', label: t('System default camera') },
     ...devices.video.map((device) => ({ value: device.deviceId, label: device.label })),
   ]
 
@@ -103,11 +105,11 @@ export default function PreJoinScreen() {
     <div className="flex min-h-dvh flex-col bg-bg">
       <header className="flex items-center justify-between border-b border-line px-4 py-3.5 sm:px-6">
         <Link to="/" className="text-[13px] text-ink-subtle transition-colors hover:text-ink">
-          NEXA Home
+          {t('NEXA Home')}
         </Link>
         <Badge variant="success">
           <LiveDot />
-          Room live
+          {t('Room live')}
         </Badge>
       </header>
 
@@ -115,16 +117,20 @@ export default function PreJoinScreen() {
         <div className="w-full max-w-2xl">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={room.visibility === 'public' ? 'accent' : 'default'}>
-              {room.visibility === 'public' ? 'Public room' : 'Private room'}
+              {room.visibility === 'public' ? t('Public room') : t('Private room')}
             </Badge>
             <Badge variant="outline" className="font-mono">
               {room.code}
             </Badge>
           </div>
 
-          <h1 className="mt-3 text-2xl font-semibold text-ink">Join “{room.name}”</h1>
+          <h1 className="mt-3 text-2xl font-semibold text-ink">{t('Join “{name}”', { name: room.name })}</h1>
           <p className="mt-1.5 text-[13.5px] text-ink-subtle">
-            Hosted by {room.hostName} · {room.participantCount} {room.participantCount === 1 ? 'person' : 'people'} inside
+            {t('Hosted by {host} · {count} {people} inside', {
+              host: room.hostName,
+              count: room.participantCount,
+              people: room.participantCount === 1 ? t('person') : t('people'),
+            })}
           </p>
 
           <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-surface shadow-md">
@@ -134,12 +140,12 @@ export default function PreJoinScreen() {
                   <div>
                     <ShieldAlert className="mx-auto h-7 w-7 text-warning" />
                     <p className="mt-3 text-sm font-medium text-ink">
-                      {videoPermission === 'denied' ? 'Camera access blocked' : 'No camera found'}
+                      {videoPermission === 'denied' ? t('Camera access blocked') : t('No camera found')}
                     </p>
                     <p className="mx-auto mt-1.5 max-w-[320px] text-[12.5px] leading-relaxed text-ink-subtle">
                       {videoPermission === 'denied'
-                        ? 'Allow camera access in your browser’s site settings, then try again. You can still join with audio.'
-                        : 'You can still join with audio and your avatar.'}
+                        ? t('Allow camera access in your browser’s site settings, then try again. You can still join with audio.')
+                        : t('You can still join with audio and your avatar.')}
                     </p>
                     {videoPermission === 'denied' ? (
                       <Button
@@ -149,7 +155,7 @@ export default function PreJoinScreen() {
                         loading={cameraRetrying}
                         onClick={handleRetryCamera}
                       >
-                        Check again
+                        {t('Check again')}
                       </Button>
                     ) : null}
                   </div>
@@ -167,14 +173,14 @@ export default function PreJoinScreen() {
                   <div className="flex flex-col items-center gap-3">
                     <Avatar name={name.trim() || 'You'} color="#7c74ff" size="2xl" />
                     <p className="text-[12.5px] text-ink-subtle">
-                      {preparing ? 'Starting preview…' : cameraOn ? 'Starting camera…' : 'Camera is off'}
+                      {preparing ? t('Starting preview…') : cameraOn ? t('Starting camera…') : t('Camera is off')}
                     </p>
                   </div>
                 </div>
               )}
 
               <span className="absolute left-3.5 top-3.5 rounded-lg bg-black/45 px-2.5 py-1 text-[11.5px] font-medium text-white backdrop-blur">
-                Your preview
+                {t('Your preview')}
               </span>
 
               <div className="absolute inset-x-0 bottom-3.5 flex items-center justify-center gap-2.5">
@@ -183,21 +189,21 @@ export default function PreJoinScreen() {
                   onToggle={() => void toggleMic()}
                   onIcon={<Mic className="h-4.5 w-4.5" />}
                   offIcon={<MicOff className="h-4.5 w-4.5" />}
-                  label={micOn ? 'Turn microphone off' : 'Turn microphone on'}
+                  label={micOn ? t('Turn microphone off') : t('Turn microphone on')}
                 />
                 <PreviewToggle
                   on={cameraOn}
                   onToggle={() => void toggleCamera()}
                   onIcon={<Camera className="h-4.5 w-4.5" />}
                   offIcon={<CameraOff className="h-4.5 w-4.5" />}
-                  label={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+                  label={cameraOn ? t('Turn camera off') : t('Turn camera on')}
                 />
               </div>
 
               {preparing ? (
                 <div className="absolute right-3.5 top-3.5 inline-flex items-center gap-1.5 rounded-lg bg-black/45 px-2.5 py-1 text-[11.5px] text-white backdrop-blur">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Preparing devices
+                  {t('Preparing devices')}
                 </div>
               ) : null}
             </div>
@@ -205,7 +211,7 @@ export default function PreJoinScreen() {
             <div className="space-y-4 border-t border-line p-4 sm:p-5">
               <div>
                 <label htmlFor="prejoin-name" className="mb-1.5 block text-[13px] font-medium text-ink-muted">
-                  Your name
+                  {t('Your name')}
                 </label>
                 <input
                   id="prejoin-name"
@@ -216,7 +222,7 @@ export default function PreJoinScreen() {
                     if (nameTaken) setNameTaken(null)
                   }}
                   maxLength={32}
-                  placeholder="e.g. Tri"
+                  placeholder={t('e.g. Tri')}
                   aria-invalid={nameError}
                   className={cn(
                     'h-10 w-full rounded-lg border bg-surface-2 px-3 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-150 placeholder:text-ink-subtle focus:outline-none focus:ring-2',
@@ -230,20 +236,20 @@ export default function PreJoinScreen() {
                 />
                 <p className="mt-1.5 text-[12.5px] text-ink-subtle">
                   {emptyName ? (
-                    <span className="text-danger">Please enter a name to continue.</span>
+                    <span className="text-danger">{t('Please enter a name to continue.')}</span>
                   ) : conflictName !== null ? (
                     <span className="font-medium text-danger">
-                      “{conflictName}” is already used in this room. Please choose a different name.
+                      {t('“{name}” is already used in this room. Please choose a different name.', { name: conflictName })}
                     </span>
                   ) : (
-                    <>You appear as “{trimmed}” to everyone in the room.</>
+                    <>{t('You appear as “{name}” to everyone in the room.', { name: trimmed })}</>
                   )}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <DeviceSelect
-                  label="Microphone"
+                  label={t('Microphone')}
                   value={activeAudioId || '__default'}
                   options={micOptions}
                   disabled={audioPermission === 'denied'}
@@ -252,7 +258,7 @@ export default function PreJoinScreen() {
                   }}
                 />
                 <DeviceSelect
-                  label="Camera"
+                  label={t('Camera')}
                   value={activeVideoId || '__default'}
                   options={camOptions}
                   disabled={videoPermission === 'denied'}
@@ -264,13 +270,13 @@ export default function PreJoinScreen() {
 
               <Button size="lg" className="w-full" onClick={() => void handleJoin()} loading={submitting} disabled={nameError}>
                 <CheckCircle2 className="h-4 w-4" />
-                {requireApproval ? 'Request to Join' : 'Join Room'}
+                {requireApproval ? t('Request to Join') : t('Join Room')}
               </Button>
 
               <p className="text-center text-[12.5px] text-ink-subtle">
                 {requireApproval
-                  ? 'The host approves new guests — you will wait in the waiting room first.'
-                  : 'No approval needed — you will enter the room right away.'}
+                  ? t('The host approves new guests — you will wait in the waiting room first.')
+                  : t('No approval needed — you will enter the room right away.')}
               </p>
             </div>
           </div>
@@ -280,7 +286,7 @@ export default function PreJoinScreen() {
             onClick={() => navigate('/rooms')}
             className="mx-auto mt-5 block text-[13px] text-ink-subtle underline-offset-4 transition-colors hover:text-ink hover:underline"
           >
-            This is not the room I want
+            {t('This is not the room I want')}
           </button>
         </div>
       </main>

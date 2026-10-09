@@ -1,6 +1,7 @@
 import { WifiOff } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import type { ConnectionQuality } from '@/types'
@@ -13,6 +14,7 @@ const BAR_LEVELS: Record<ConnectionQuality, number> = {
 }
 
 export function ConnectionRadar({ className, showText = true }: { className?: string; showText?: boolean }) {
+  const t = useT()
   const stats = useCallStore((state) => state.stats)
   const connected = useRoomSessionStore((state) => state.connected)
   const bars = BAR_LEVELS[stats.quality]
@@ -21,7 +23,7 @@ export function ConnectionRadar({ className, showText = true }: { className?: st
     return (
       <span className={cn('inline-flex items-center gap-1.5 text-[12px] font-medium text-danger', className)}>
         <WifiOff className="h-3.5 w-3.5" />
-        {showText ? 'Reconnecting…' : null}
+        {showText ? t('Reconnecting…') : null}
       </span>
     )
   }
@@ -37,9 +39,13 @@ export function ConnectionRadar({ className, showText = true }: { className?: st
 
   const tooltip = (
     <div className="space-y-1">
-      <p className="text-ink">Connection: {stats.quality}</p>
+      <p className="text-ink">{t('Connection: {quality}', { quality: stats.quality })}</p>
       <p className="font-mono text-ink-muted">
-        {stats.ping} ms · {stats.jitter} ms jitter · {stats.loss}% loss
+        {t('{ping} ms · {jitter} ms jitter · {loss}% loss', {
+          ping: stats.ping,
+          jitter: stats.jitter,
+          loss: stats.loss,
+        })}
       </p>
       <p className="font-mono text-ink-subtle">{stats.bitrate} kbps</p>
     </div>
@@ -49,7 +55,10 @@ export function ConnectionRadar({ className, showText = true }: { className?: st
     <Tooltip content={tooltip} side="bottom">
       <button
         type="button"
-        aria-label={`Connection quality: ${stats.quality}, ${stats.ping} milliseconds ping`}
+        aria-label={t('Connection quality: {quality}, {ping} milliseconds ping', {
+          quality: stats.quality,
+          ping: stats.ping,
+        })}
         className={cn(
           'inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink',
           className,
@@ -69,7 +78,7 @@ export function ConnectionRadar({ className, showText = true }: { className?: st
         </span>
         {showText ? (
           <span className="hidden font-mono text-ink-subtle sm:inline">
-            {stats.ping} ms · {stats.loss}% loss
+            {t('{ping} ms · {loss}% loss', { ping: stats.ping, loss: stats.loss })}
           </span>
         ) : null}
       </button>

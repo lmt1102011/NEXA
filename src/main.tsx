@@ -1,16 +1,19 @@
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/inter'
 import '@/styles/index.css'
+import '@/lib/translations'
 import App from '@/app/App'
 import { initSessionAppearance } from '@/stores/session'
 import { useRoomsStore } from '@/stores/rooms'
 import { lockZoom } from '@/lib/lockZoom'
 import { enableTapCompat } from '@/lib/tapCompat'
 import { startPublicRoomsDirectory } from '@/services/directory/PublicRoomsDirectory'
+import { useI18nStore } from '@/lib/i18n'
 
 initSessionAppearance()
 lockZoom()
 enableTapCompat()
+document.documentElement.lang = useI18nStore.getState().lang
 
 const container = document.getElementById('root')
 if (container) {

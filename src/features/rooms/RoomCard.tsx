@@ -5,9 +5,11 @@ import type { Room } from '@/types'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge, LiveDot } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { avatarColorFor, timeAgo } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
+import { avatarColorFor } from '@/lib/utils'
 
 export function RoomCard({ room, index = 0 }: { room: Room; index?: number }) {
+  const t = useT()
   const isLive = room.status === 'live'
   const isFull = room.participantCount >= room.settings.participants.maxParticipants
 
@@ -24,22 +26,22 @@ export function RoomCard({ room, index = 0 }: { room: Room; index?: number }) {
         </h3>
         {isFull ? (
           <Badge variant="warning" className="shrink-0">
-            Full
+            {t('Full')}
           </Badge>
         ) : isLive ? (
           <Badge variant="success" className="shrink-0">
             <LiveDot />
-            Live
+            {t('Live')}
           </Badge>
         ) : (
-          <Badge className="shrink-0">Idle</Badge>
+          <Badge className="shrink-0">{t('Idle')}</Badge>
         )}
       </div>
 
       <div className="mt-3 flex items-center gap-2">
         <Avatar name={room.hostName} size="xs" color={avatarColorFor(room.hostName)} />
-        <span className="truncate text-[13px] text-ink-muted">
-          Hosted by <span className="font-medium text-ink-muted">{room.hostName}</span>
+<span className="truncate text-[13px] text-ink-muted">
+          {t('Hosted by')} <span className="font-medium text-ink-muted">{room.hostName}</span>
         </span>
       </div>
 
@@ -51,25 +53,25 @@ export function RoomCard({ room, index = 0 }: { room: Room; index?: number }) {
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3.5">
         <div className="flex min-w-0 items-center gap-3 text-[12.5px] text-ink-subtle">
-          <span className="inline-flex items-center gap-1.5 font-mono" title={`${room.participantCount} of ${room.settings.participants.maxParticipants} seats`}>
+          <span className="inline-flex items-center gap-1.5 font-mono" title={t('{count} of {total} seats', { count: room.participantCount, total: room.settings.participants.maxParticipants })}>
             <Users className="h-3.5 w-3.5" />
             {room.participantCount}/{room.settings.participants.maxParticipants}
           </span>
           {room.visibility === 'private' ? (
             <Badge variant="outline" className="h-5 px-1.5 text-[10.5px]">
-              Private
+              {t('Private')}
             </Badge>
           ) : (
-            <span className="hidden truncate sm:inline">{timeAgo(room.lastActiveAt)}</span>
+            <span className="hidden truncate sm:inline"><RoomTimeAgo at={room.lastActiveAt} /></span>
           )}
         </div>
         <Link to={`/room/${room.id}`} className="shrink-0">
           <Button
             size="sm"
             variant={isFull ? 'secondary' : 'primary'}
-            aria-label={isFull ? `View ${room.name}` : `Join ${room.name}`}
+            aria-label={t(isFull ? 'View {name}' : 'Join {name}', { name: room.name })}
           >
-            {isFull ? 'View' : 'Join'}
+            {t(isFull ? 'View' : 'Join')}
           </Button>
         </Link>
       </div>
@@ -95,4 +97,16 @@ export function RoomCardSkeleton() {
       </div>
     </div>
   )
+}
+
+function RoomTimeAgo({ at }: { at: number }) {
+  const t = useT()
+  const seconds = Math.max(0, Math.floor((Date.now() - at) / 1000))
+  if (seconds < 45) return <>{t('just now')}</>
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return <>{t('{n}m ago', { n: minutes })}</>
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return <>{t('{n}h ago', { n: hours })}</>
+  const days = Math.floor(hours / 24)
+  return <>{t('{n}d ago', { n: days })}</>
 }

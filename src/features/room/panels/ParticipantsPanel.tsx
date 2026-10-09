@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useRoomSessionStore } from '@/stores/roomSession'
+import { t, useT } from '@/lib/i18n'
 import {
   acceptAllRequests,
   acceptRequest,
@@ -41,14 +42,15 @@ function isCoHost(participant: ParticipantPermissions | undefined) {
 
 function timeAgo(timestamp: number) {
   const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
-  if (seconds < 60) return `${seconds}s ago`
-  return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 60) return t('{seconds}s ago', { seconds })
+  return t('{minutes}m ago', { minutes: Math.floor(seconds / 60) })
 }
 
 export function ParticipantsPanel() {
   const participants = useRoomSessionStore((state) => state.participants)
   const requests = useRoomSessionStore((state) => state.requests)
   const self = useRoomSessionStore((state) => state.self)
+  const t = useT()
   const [query, setQuery] = useState('')
 
   const isHost = self?.role === 'host'
@@ -74,7 +76,7 @@ export function ParticipantsPanel() {
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-2 text-[12.5px] font-medium text-warning">
               <Clock className="h-3.5 w-3.5" />
-              {requests.length} pending {requests.length === 1 ? 'request' : 'requests'}
+              {t('{count} pending requests', { count: requests.length })}
             </p>
             {requests.length > 1 ? (
               <button
@@ -82,7 +84,7 @@ export function ParticipantsPanel() {
                 onClick={acceptAllRequests}
                 className="text-[12.5px] font-medium text-accent underline-offset-4 hover:underline"
               >
-                Accept all
+                {t('Accept all')}
               </button>
             ) : null}
           </div>
@@ -95,14 +97,14 @@ export function ParticipantsPanel() {
                   <p className="truncate text-[13.5px] font-medium text-ink">{request.name}</p>
                   <p className="flex items-center gap-1.5 text-[11.5px] text-ink-subtle">
                     {request.micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3 text-danger" />}
-                    {request.cameraOn ? 'camera on' : 'camera off'} · {timeAgo(request.requestedAt)}
+                    {request.cameraOn ? t('camera on') : t('camera off')} · {timeAgo(request.requestedAt)}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
-                  <Button size="sm" variant="ghost" aria-label={`Decline ${request.name}`} onClick={() => rejectRequest(request.id)}>
+                  <Button size="sm" variant="ghost" aria-label={t('Decline {name}', { name: request.name })} onClick={() => rejectRequest(request.id)}>
                     <X className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" aria-label={`Accept ${request.name}`} onClick={() => acceptRequest(request.id)}>
+                  <Button size="sm" aria-label={t('Accept {name}', { name: request.name })} onClick={() => acceptRequest(request.id)}>
                     <Check className="h-4 w-4" />
                   </Button>
                 </div>
@@ -114,7 +116,7 @@ export function ParticipantsPanel() {
 
       <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-2 pt-3">
         <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-subtle">
-          In the room — {participants.length}
+          {t('In the room — {count}', { count: participants.length })}
         </p>
       </div>
 
@@ -125,8 +127,8 @@ export function ParticipantsPanel() {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search people…"
-              aria-label="Search participants"
+              placeholder={t('Search people…')}
+              aria-label={t('Search participants')}
               className="h-9 pl-8 text-[13px]"
             />
           </div>
@@ -135,7 +137,7 @@ export function ParticipantsPanel() {
 
       <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto nx-scroll px-2 pb-3">
         {filtered.length === 0 ? (
-          <EmptyState icon={<Users className="h-5 w-5" />} title="Nobody matches" description="Try another name." />
+          <EmptyState icon={<Users className="h-5 w-5" />} title={t('Nobody matches')} description={t('Try another name.')} />
         ) : (
           filtered.map((participant) => (
             <div
@@ -159,15 +161,15 @@ export function ParticipantsPanel() {
 
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate text-[13.5px] font-medium text-ink">
-                  {participant.isSelf ? `${participant.name} (You)` : participant.name}
+                  {participant.isSelf ? t('{name} (You)', { name: participant.name }) : participant.name}
                   {participant.role === 'host' ? <Crown className="h-3.5 w-3.5 shrink-0 text-warning" /> : null}
                 </p>
                 <p className="flex items-center gap-1.5 text-[11.5px] text-ink-subtle">
-                  {participant.role === 'host' ? 'Host' : 'Guest'}
-                  {participant.role !== 'host' && isCoHost(participant.permissions) ? ' · Co-host' : ''}
+                  {participant.role === 'host' ? t('Host') : t('Guest')}
+                  {participant.role !== 'host' && isCoHost(participant.permissions) ? ` · ${t('Co-host')}` : ''}
                   {participant.quality === 'poor' || participant.quality === 'fair' ? (
                     <span className="inline-flex items-center gap-1 text-warning">
-                      · <WifiOff className="h-3 w-3" /> {participant.quality}
+                      · <WifiOff className="h-3 w-3" /> {t(participant.quality)}
                     </span>
                   ) : null}
                 </p>
@@ -178,7 +180,7 @@ export function ParticipantsPanel() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      aria-label={`Actions for ${participant.name}`}
+                      aria-label={t('Actions for {name}', { name: participant.name })}
                       className="grid h-8 w-8 place-items-center rounded-lg text-ink-subtle opacity-0 transition-opacity hover:bg-surface-3 hover:text-ink focus:opacity-100 group-hover:opacity-100"
                     >
                       <MoreVertical className="h-4 w-4" />
@@ -188,11 +190,11 @@ export function ParticipantsPanel() {
                     <DropdownMenuLabel>{participant.name}</DropdownMenuLabel>
                     <DropdownMenuItem disabled={!participant.micOn} onSelect={() => hostMuteParticipant(participant.id)}>
                       <MicOff className="h-4 w-4" />
-                      Mute
+                      {t('Mute')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => hostTransferHost(participant.id)}>
                       <ShieldCheck className="h-4 w-4" />
-                      Make host
+                      {t('Make host')}
                     </DropdownMenuItem>
 
                     {isHost ? (
@@ -207,7 +209,7 @@ export function ParticipantsPanel() {
                           }
                         >
                           <ShieldCheck className="h-4 w-4" />
-                          {isCoHost(participant.permissions) ? 'Remove co-host' : 'Make co-host'}
+                          {isCoHost(participant.permissions) ? t('Remove co-host') : t('Make co-host')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => togglePermission(participant.id, participant.permissions, 'canShareScreen')}
@@ -217,7 +219,7 @@ export function ParticipantsPanel() {
                           ) : (
                             <span className="h-4 w-4" />
                           )}
-                          Can share screen
+                          {t('Can share screen')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => togglePermission(participant.id, participant.permissions, 'canModerate')}
@@ -227,7 +229,7 @@ export function ParticipantsPanel() {
                           ) : (
                             <span className="h-4 w-4" />
                           )}
-                          Can mute & remove
+                          {t('Can mute & remove')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => togglePermission(participant.id, participant.permissions, 'canManageRoom')}
@@ -237,7 +239,7 @@ export function ParticipantsPanel() {
                           ) : (
                             <span className="h-4 w-4" />
                           )}
-                          Can manage room
+                          {t('Can manage room')}
                         </DropdownMenuItem>
                       </>
                     ) : null}
@@ -245,14 +247,14 @@ export function ParticipantsPanel() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem destructive onSelect={() => hostRemoveParticipant(participant.id)}>
                       <Trash className="h-4 w-4" />
-                      Remove from room
+                      {t('Remove from room')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : participant.isSelf ? (
                 <Badge variant="accent" className="shrink-0">
                   <UserPlus className="h-3 w-3" />
-                  You
+                  {t('You')}
                 </Badge>
               ) : null}
             </div>

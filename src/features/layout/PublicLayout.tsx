@@ -1,8 +1,10 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Logo, LogoMark } from '@/components/brand/logo'
+import { LanguageToggle } from '@/components/app/language-toggle'
 import { ThemeToggle } from '@/components/app/theme-toggle'
 import { Avatar } from '@/components/ui/avatar'
 import { useSessionStore } from '@/stores/session'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/cn'
 
 function navLinkClass(isActive: boolean) {
@@ -15,6 +17,7 @@ function navLinkClass(isActive: boolean) {
 export default function PublicLayout() {
   const displayName = useSessionStore((state) => state.displayName)
   const avatarColor = useSessionStore((state) => state.avatarColor)
+  const t = useT()
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
@@ -23,23 +26,24 @@ export default function PublicLayout() {
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-          <Link to="/" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="NEXA home">
+          <Link to="/" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={t('NEXA home')}>
             <Logo />
           </Link>
 
-          <nav className="flex items-center gap-1" aria-label="Main">
+          <nav className="flex items-center gap-1" aria-label={t('Main')}>
             <NavLink to="/rooms" className={({ isActive }) => navLinkClass(isActive)}>
-              Rooms
+              {t('Rooms')}
             </NavLink>
             <NavLink to="/create" className={({ isActive }) => navLinkClass(isActive)}>
-              Create
+              {t('Create')}
             </NavLink>
           </nav>
 
           <div className="flex items-center gap-1.5">
+            <LanguageToggle />
             <ThemeToggle />
-            <Link to="/settings" aria-label="Settings" className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2">
-              <Avatar name={displayName || 'You'} color={avatarColor} size="sm" />
+            <Link to="/settings" aria-label={t('Settings')} className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2">
+              <Avatar name={displayName || t('You')} color={avatarColor} size="sm" />
             </Link>
           </div>
         </div>
@@ -54,18 +58,18 @@ export default function PublicLayout() {
           <div className="flex items-center gap-2.5">
             <LogoMark size={22} />
             <span className="text-[13px] text-ink-subtle">
-              NEXA — Talk. Share. Connect.
+              NEXA — {t('Talk. Share. Connect.')}
             </span>
           </div>
-          <nav className="flex items-center gap-5 text-[13px] text-ink-subtle" aria-label="Footer">
+          <nav className="flex items-center gap-5 text-[13px] text-ink-subtle" aria-label={t('Footer')}>
             <Link to="/rooms" className="transition-colors hover:text-ink">
-              Rooms
+              {t('Rooms')}
             </Link>
             <Link to="/create" className="transition-colors hover:text-ink">
-              Create room
+              {t('Create room')}
             </Link>
             <Link to="/settings" className="transition-colors hover:text-ink">
-              Settings
+              {t('Settings')}
             </Link>
           </nav>
         </div>

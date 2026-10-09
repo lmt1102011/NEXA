@@ -1,6 +1,7 @@
 import { Clapperboard, Keyboard, MessageSquare, Settings, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
 import type { RoomPanel } from '@/types'
@@ -15,6 +16,7 @@ interface RailItem {
 }
 
 export function RoomRail() {
+  const t = useT()
   const navigate = useNavigate()
   const { roomId } = useParams()
   const panel = useUiStore((state) => state.panel)
@@ -29,39 +31,39 @@ export function RoomRail() {
     {
       panel: 'chat',
       icon: <MessageSquare className="h-[18px] w-[18px]" />,
-      label: 'Chat',
+      label: t('Chat'),
       badge: unread,
       onClick: () => setPanel('chat'),
     },
     {
       panel: 'participants',
       icon: <Users className="h-[18px] w-[18px]" />,
-      label: 'People',
+      label: t('People'),
       badge: requests,
       onClick: () => setPanel('participants'),
     },
     {
       panel: 'activities',
       icon: <Clapperboard className="h-[18px] w-[18px]" />,
-      label: 'Activities',
+      label: t('Activities'),
       dot: activitiesUnread > 0 && panel !== 'activities',
       onClick: () => setPanel('activities'),
     },
     self?.role === 'host'
       ? {
           icon: <Settings className="h-[18px] w-[18px]" />,
-          label: 'Room',
+          label: t('Room'),
           onClick: () => navigate(`/room/${roomId}/settings`),
         }
       : {
           icon: <Keyboard className="h-[18px] w-[18px]" />,
-          label: 'Keys',
+          label: t('Keys'),
           onClick: () => setShortcutsOpen(true),
         },
   ]
 
   return (
-    <nav aria-label="Room navigation" className="hidden w-[72px] shrink-0 flex-col items-center gap-2 border-r border-line bg-surface/50 py-4 lg:flex">
+    <nav aria-label={t('Room navigation')} className="hidden w-[72px] shrink-0 flex-col items-center gap-2 border-r border-line bg-surface/50 py-4 lg:flex">
       {items.map((item) => {
         const active = item.panel ? panel === item.panel : false
         return (

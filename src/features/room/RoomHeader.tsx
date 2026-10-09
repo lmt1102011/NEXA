@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Badge, LiveDot } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LogoMark } from '@/components/brand/logo'
+import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
 import { ConnectionRadar } from '@/features/room/ConnectionRadar'
 
 export function RoomHeader() {
+  const t = useT()
   const navigate = useNavigate()
   const room = useRoomSessionStore((state) => state.room)
   const self = useRoomSessionStore((state) => state.self)
@@ -22,7 +24,7 @@ export function RoomHeader() {
     <header className="relative z-20 flex h-14 shrink-0 items-center gap-2.5 border-b border-line bg-surface/85 px-3 backdrop-blur sm:px-4">
       <Link
         to="/"
-        aria-label="NEXA home"
+        aria-label={t('NEXA home')}
         className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors hover:bg-surface-3"
       >
         <LogoMark size={22} />
@@ -35,12 +37,12 @@ export function RoomHeader() {
         </Badge>
         <Badge variant="success" className="hidden md:inline-flex">
           <LiveDot />
-          Live
+          {t('Live')}
         </Badge>
         {room.settings.access.lockRoom ? (
           <Badge variant="warning">
             <Lock className="h-3 w-3" />
-            <span className="hidden sm:inline">Locked</span>
+            <span className="hidden sm:inline">{t('Locked')}</span>
           </Badge>
         ) : null}
       </div>
@@ -51,7 +53,7 @@ export function RoomHeader() {
         <button
           type="button"
           onClick={() => setPanel('participants')}
-          aria-label="Show participants"
+          aria-label={t('Show participants')}
           className="hidden h-9 items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-[13px] font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink sm:inline-flex"
         >
           <Users className="h-4 w-4" />
@@ -62,7 +64,7 @@ export function RoomHeader() {
           <button
             type="button"
             onClick={() => navigate(`/room/${room.id}/settings`)}
-            aria-label="Room settings"
+            aria-label={t('Room settings')}
             className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-surface-2 text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
             <Settings className="h-4 w-4" />
@@ -71,7 +73,7 @@ export function RoomHeader() {
 
         <Button size="sm" variant="secondary" className="hidden md:inline-flex" onClick={() => setModal('invite')}>
           <UserPlus className="h-4 w-4" />
-          Invite
+          {t('Invite')}
         </Button>
       </div>
     </header>

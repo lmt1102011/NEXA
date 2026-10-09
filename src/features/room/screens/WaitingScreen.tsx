@@ -5,8 +5,10 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useCallStore } from '@/stores/call'
+import { useT } from '@/lib/i18n'
 
 export default function WaitingScreen() {
+  const t = useT()
   const room = useRoomSessionStore((state) => state.room)
   const self = useRoomSessionStore((state) => state.self)
   const setStatus = useRoomSessionStore((state) => state.setStatus)
@@ -40,10 +42,11 @@ export default function WaitingScreen() {
           </div>
         </div>
 
-        <h1 className="mt-6 text-xl font-semibold text-ink">Waiting for the host…</h1>
+        <h1 className="mt-6 text-xl font-semibold text-ink">{t('Waiting for the host…')}</h1>
         <p className="mt-2 text-[13.5px] leading-relaxed text-ink-subtle">
-          Your request to join <span className="text-ink">{room.name}</span> has been sent. This page updates
-          automatically — no need to refresh.
+          {t('Your request to join {room} has been sent. This page updates automatically — no need to refresh.', {
+            room: room.name,
+          })}
         </p>
 
         <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3.5 py-2.5">
@@ -51,7 +54,7 @@ export default function WaitingScreen() {
             <span className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-accent opacity-70" />
             <span className="relative h-2 w-2 rounded-full bg-accent-solid" />
           </span>
-          <span className="text-[12.5px] font-medium text-ink-muted">Request sent just now</span>
+          <span className="text-[12.5px] font-medium text-ink-muted">{t('Request sent just now')}</span>
         </div>
 
         <AnimatePresence>
@@ -64,11 +67,11 @@ export default function WaitingScreen() {
             >
               <Badge variant={micOn ? 'default' : 'danger'}>
                 {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
-                Mic {micOn ? 'on' : 'off'}
+                {micOn ? t('Mic on') : t('Mic off')}
               </Badge>
               <Badge variant={cameraOn ? 'default' : 'danger'}>
                 {cameraOn ? <Camera className="h-3 w-3" /> : <CameraOff className="h-3 w-3" />}
-                Camera {cameraOn ? 'on' : 'off'}
+                {cameraOn ? t('Camera on') : t('Camera off')}
               </Badge>
             </motion.div>
           ) : null}
@@ -83,10 +86,10 @@ export default function WaitingScreen() {
               className="mt-4 rounded-xl border border-danger/50 bg-danger-soft px-4 py-3 text-left"
             >
               <p className="text-[13px] font-medium text-danger">
-                The name “{nameTaken}” is already used by someone else in this room.
+                {t('The name “{name}” is already used by someone else in this room.', { name: nameTaken })}
               </p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-ink-subtle">
-                The host did not accept this request. Pick another name before trying again.
+                {t('The host did not accept this request. Pick another name before trying again.')}
               </p>
             </motion.div>
           ) : null}
@@ -95,13 +98,13 @@ export default function WaitingScreen() {
         <div className="mt-7 flex flex-col gap-2.5">
           <Button variant="secondary" onClick={() => setStatus('prejoin')}>
             {nameBlocked ? <PencilLine className="h-4 w-4" /> : null}
-            {nameBlocked ? 'Change name' : 'Cancel request'}
+            {nameBlocked ? t('Change name') : t('Cancel request')}
           </Button>
         </div>
 
         <p className="mt-5 flex items-center justify-center gap-1.5 text-[12.5px] text-ink-subtle">
           <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-          Your devices stay ready while you wait
+          {t('Your devices stay ready while you wait')}
         </p>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Segmented } from '@/components/ui/segmented'
+import { useT } from '@/lib/i18n'
 import { useRoomsStore } from '@/stores/rooms'
 import { usePublicRooms } from '@/features/rooms/usePublicRooms'
 import { RoomCard, RoomCardSkeleton } from '@/features/rooms/RoomCard'
@@ -12,19 +13,20 @@ import type { Room } from '@/types'
 
 type SortKey = 'live' | 'people' | 'recent'
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'live', label: 'Live' },
-  { value: 'people', label: 'Most people' },
-  { value: 'recent', label: 'Recently active' },
-]
-
 export default function RoomsPage() {
+  const t = useT()
   const localRooms = useRoomsStore((state) => state.rooms)
   const rooms = usePublicRooms()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('live')
   const [loading, setLoading] = useState(true)
+
+  const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+    { value: 'live', label: t('Live') },
+    { value: 'people', label: t('Most people') },
+    { value: 'recent', label: t('Recently active') },
+  ]
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLoading(false), 520)
@@ -70,9 +72,9 @@ export default function RoomsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ink">Public rooms</h1>
+        <h1 className="text-2xl font-semibold text-ink">{t('Public rooms')}</h1>
         <p className="text-[14px] text-ink-subtle">
-          Browse live rooms, or search by room name and code.
+          {t('Browse live rooms, or search by room name and code.')}
         </p>
       </div>
 
@@ -82,14 +84,14 @@ export default function RoomsPage() {
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search rooms..."
-            aria-label="Search rooms"
+            placeholder={t('Search rooms...')}
+            aria-label={t('Search rooms')}
             className="pl-10"
           />
         </div>
         <div className="w-full overflow-x-auto pb-1 sm:w-auto sm:pb-0">
           <Segmented
-            ariaLabel="Sort rooms"
+            ariaLabel={t('Sort rooms')}
             value={sort}
             onChange={setSort}
             options={SORT_OPTIONS}
@@ -120,19 +122,19 @@ export default function RoomsPage() {
       {!loading && results.length === 0 && !privateMatch ? (
         <EmptyState
           icon={<SearchX className="h-5 w-5" />}
-          title="No rooms found"
+          title={t('No rooms found')}
           description={
             query
-              ? `Nothing matches “${query}”. Try a different name or room code.`
-              : 'There are no public rooms right now. Why not create one?'
+              ? t('Nothing matches “{query}”. Try a different name or room code.', { query })
+              : t('There are no public rooms right now. Why not create one?')
           }
           action={
             <div className="flex gap-2.5">
               <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
-                Clear search
+                {t('Clear search')}
               </Button>
               <Button size="sm" onClick={() => navigate('/create')}>
-                Create Room
+                {t('Create Room')}
               </Button>
             </div>
           }

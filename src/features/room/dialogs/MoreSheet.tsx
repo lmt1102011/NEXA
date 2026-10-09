@@ -2,6 +2,7 @@ import { Clapperboard, Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settin
 import { useNavigate, useParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useCallStore } from '@/stores/call'
 import { useUiStore } from '@/stores/ui'
@@ -18,35 +19,42 @@ export function MoreSheet() {
   const sharing = useCallStore((state) => state.sharing)
   const navigate = useNavigate()
   const { roomId } = useParams()
+  const t = useT()
 
   const isHost = self?.role === 'host'
 
   const entries = [
-    { icon: <MessageSquare className="h-4.5 w-4.5" />, label: 'Chat', onClick: () => setPanel('chat') },
+    { icon: <MessageSquare className="h-4.5 w-4.5" />, label: t('Chat'), onClick: () => setPanel('chat') },
     {
       icon: <Users className="h-4.5 w-4.5" />,
-      label: 'People',
+      label: t('People'),
       badge: requests,
       onClick: () => setPanel('participants'),
     },
     {
       icon: <MonitorUp className="h-4.5 w-4.5" />,
-      label: sharing ? 'Stop sharing' : 'Share screen',
+      label: sharing ? t('Stop sharing') : t('Share screen'),
       tone: 'danger',
       active: sharing,
       onClick: () => void toggleScreenShare(),
     },
     {
       icon: <Clapperboard className="h-4.5 w-4.5" />,
-      label: 'Activities',
+      label: t('Activities'),
       dot: activitiesUnread > 0,
       onClick: () => setPanel('activities'),
     },
-    { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: 'Devices', onClick: () => setModal('devices') },
-    { icon: <Link2 className="h-4.5 w-4.5" />, label: 'Invite', onClick: () => setModal('invite') },
-    { icon: <Keyboard className="h-4.5 w-4.5" />, label: 'Shortcuts', onClick: () => setShortcutsOpen(true) },
+    { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: t('Devices'), onClick: () => setModal('devices') },
+    { icon: <Link2 className="h-4.5 w-4.5" />, label: t('Invite'), onClick: () => setModal('invite') },
+    { icon: <Keyboard className="h-4.5 w-4.5" />, label: t('Shortcuts'), onClick: () => setShortcutsOpen(true) },
     ...(isHost
-      ? [{ icon: <Settings className="h-4.5 w-4.5" />, label: 'Room settings', onClick: () => navigate(`/room/${roomId}/settings`) }]
+      ? [
+          {
+            icon: <Settings className="h-4.5 w-4.5" />,
+            label: t('Room settings'),
+            onClick: () => navigate(`/room/${roomId}/settings`),
+          },
+        ]
       : []),
   ]
 
@@ -61,7 +69,7 @@ export function MoreSheet() {
         if (!open) setModal(null)
       }}
     >
-      <SheetContent side="bottom" title="Room menu" description="Everything else you can do here.">
+      <SheetContent side="bottom" title={t('Room menu')} description={t('Everything else you can do here.')}>
         <div className="grid grid-cols-3 gap-2.5">
           {entries.map((entry) => (
             <button
@@ -114,7 +122,7 @@ export function MoreSheet() {
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-danger-solid px-4 py-3 text-[14px] font-medium text-white transition hover:brightness-110"
         >
           <LogOut className="h-4 w-4" />
-          Leave room
+          {t('Leave room')}
         </button>
       </SheetContent>
     </Sheet>

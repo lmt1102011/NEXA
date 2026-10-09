@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label, FieldHint } from '@/components/ui/input'
 import { useSessionStore } from '@/stores/session'
 import { toast } from '@/stores/ui'
+import { useT } from '@/lib/i18n'
 import type { AccentName } from '@/types'
 
 const ACCENTS: { value: AccentName; label: string; swatch: string }[] = [
@@ -32,6 +33,7 @@ const AVATAR_SWATCHES = [
 ]
 
 export default function UserSettingsPage() {
+  const t = useT()
   const navigate = useNavigate()
   const displayName = useSessionStore((state) => state.displayName)
   const setName = useSessionStore((state) => state.setName)
@@ -48,50 +50,50 @@ export default function UserSettingsPage() {
   function saveName() {
     if (nameError) return
     setName(nameDraft.trim())
-    toast({ title: 'Profile saved', description: 'Your display name was updated.', variant: 'success', duration: 2400 })
+    toast({ title: t('Profile saved'), description: t('Your display name was updated.'), variant: 'success', duration: 2400 })
   }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ink">Settings</h1>
-        <p className="text-[14px] text-ink-subtle">Profile and appearance — applied everywhere on this device.</p>
+        <h1 className="text-2xl font-semibold text-ink">{t('Settings')}</h1>
+        <p className="text-[14px] text-ink-subtle">{t('Profile and appearance — applied everywhere on this device.')}</p>
       </div>
 
       <div className="mt-8 space-y-5">
-        <Card title="Profile" description="How you appear in rooms and chat.">
+        <Card title={t('Profile')} description={t('How you appear in rooms and chat.')}>
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
             <div className="flex shrink-0 flex-col items-center gap-2">
               <Avatar name={nameDraft.trim() || 'You'} color={avatarColor} size="2xl" />
-              <Badge variant="outline">Your avatar</Badge>
+              <Badge variant="outline">{t('Your avatar')}</Badge>
             </div>
 
             <div className="min-w-0 flex-1 space-y-4">
               <div>
-                <Label htmlFor="settings-name">Display name</Label>
+                <Label htmlFor="settings-name">{t('Display name')}</Label>
                 <Input
                   id="settings-name"
                   value={nameDraft}
                   onChange={(event) => setNameDraft(event.target.value)}
                   onBlur={saveName}
                   maxLength={32}
-                  placeholder="e.g. Tri"
+                  placeholder={t('e.g. Tri')}
                 />
                 {nameError ? (
-                  <FieldHint className="text-danger">Name cannot be empty.</FieldHint>
+                  <FieldHint className="text-danger">{t('Name cannot be empty.')}</FieldHint>
                 ) : (
-                  <FieldHint>Shown to everyone you talk to.</FieldHint>
+                  <FieldHint>{t('Shown to everyone you talk to.')}</FieldHint>
                 )}
               </div>
 
               <div>
-                <span className="mb-2 block text-[13px] font-medium text-ink-muted">Avatar color</span>
+                <span className="mb-2 block text-[13px] font-medium text-ink-muted">{t('Avatar color')}</span>
                 <div className="flex flex-wrap gap-2">
                   {AVATAR_SWATCHES.map((color) => (
                     <button
                       key={color}
                       type="button"
-                      aria-label={`Avatar color ${color}`}
+                      aria-label={t('Avatar color {color}', { color })}
                       aria-pressed={avatarColor === color}
                       onClick={() => setAvatarColor(color)}
                       className={cn(
@@ -109,22 +111,22 @@ export default function UserSettingsPage() {
           </div>
         </Card>
 
-        <Card title="Appearance" description="Theme and accent color for the whole app.">
+        <Card title={t('Appearance')} description={t('Theme and accent color for the whole app.')}>
           <div className="space-y-5">
             <div>
-              <span className="mb-2 block text-[13px] font-medium text-ink-muted">Theme</span>
+              <span className="mb-2 block text-[13px] font-medium text-ink-muted">{t('Theme')}</span>
               <div className="grid grid-cols-3 gap-2.5">
                 <ThemeCard
                   active={theme === 'dark'}
                   onClick={() => setTheme('dark')}
                   icon={<Moon className="h-4 w-4" />}
-                  label="Dark"
+                  label={t('Dark')}
                 />
                 <ThemeCard
                   active={theme === 'light'}
                   onClick={() => setTheme('light')}
                   icon={<Sun className="h-4 w-4" />}
-                  label="Light"
+                  label={t('Light', { ctx: 'theme' })}
                 />
                 <ThemeCard
                   active={false}
@@ -133,13 +135,13 @@ export default function UserSettingsPage() {
                     setTheme(prefersLight ? 'light' : 'dark')
                   }}
                   icon={<Monitor className="h-4 w-4" />}
-                  label="System"
+                  label={t('System')}
                 />
               </div>
             </div>
 
             <div>
-              <span className="mb-2 block text-[13px] font-medium text-ink-muted">Accent color</span>
+              <span className="mb-2 block text-[13px] font-medium text-ink-muted">{t('Accent color')}</span>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
                 {ACCENTS.map((option) => (
                   <button
@@ -155,7 +157,7 @@ export default function UserSettingsPage() {
                     )}
                   >
                     <span className="h-5 w-5 shrink-0 rounded-full" style={{ backgroundColor: option.swatch }} />
-                    <span className="truncate text-[13px] font-medium text-ink">{option.label}</span>
+                    <span className="truncate text-[13px] font-medium text-ink">{t(option.label)}</span>
                     {accent === option.value ? <Check className="ml-auto h-3.5 w-3.5 text-accent" /> : null}
                   </button>
                 ))}
@@ -164,23 +166,23 @@ export default function UserSettingsPage() {
           </div>
         </Card>
 
-        <Card title="About" description="Build information.">
+        <Card title={t('About')} description={t('Build information.')}>
           <div className="space-y-2 text-[13.5px] text-ink-muted">
             <p className="flex justify-between gap-4">
-              <span>App version</span>
+              <span>{t('App version')}</span>
               <span className="font-mono text-ink">NEXA 1.1.0</span>
             </p>
             <p className="flex justify-between gap-4">
-              <span>Realtime transport</span>
+              <span>{t('Realtime transport')}</span>
               <span className="font-mono text-ink">WebRTC · Trystero (Nostr signaling)</span>
             </p>
             <p className="flex justify-between gap-4">
-              <span>Media</span>
+              <span>{t('Media')}</span>
               <span className="font-mono text-ink">getUserMedia / getDisplayMedia</span>
             </p>
           </div>
           <Button variant="ghost" size="sm" className="mt-4 px-0" onClick={() => navigate('/')}>
-            Back to Home
+            {t('Back to Home')}
           </Button>
         </Card>
       </div>

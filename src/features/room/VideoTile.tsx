@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { Avatar } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ export function VideoTile({
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const t = useT()
   const isSelf = participant.isSelf
   const self = useRoomSessionStore((state) => state.self)
   const canModerateSelf = self?.role === 'host' || Boolean(self?.permissions?.canModerate)
@@ -133,7 +135,7 @@ export function VideoTile({
         {!participant.micOn ? (
           <MicOff className="h-3.5 w-3.5 shrink-0 text-danger" />
         ) : participant.isSpeaking ? (
-          <span className="flex h-3.5 w-3.5 items-end justify-center gap-[2px]" aria-label="Speaking">
+          <span className="flex h-3.5 w-3.5 items-end justify-center gap-[2px]" aria-label={t('Speaking')}>
             {[0, 1, 2].map((index) => (
               <motion.span
                 key={index}
@@ -147,7 +149,7 @@ export function VideoTile({
           <Mic className="h-3.5 w-3.5 shrink-0 text-white/85" />
         )}
         <span className="truncate text-[11.5px] font-medium text-white">
-          {participant.isSelf ? `${participant.name} (You)` : participant.name}
+          {participant.isSelf ? t('{name} (You)', { name: participant.name }) : participant.name}
         </span>
         {participant.role === 'host' ? <Crown className="h-3.5 w-3.5 shrink-0 text-warning" /> : null}
       </div>
@@ -158,7 +160,7 @@ export function VideoTile({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                aria-label={`Actions for ${participant.name}`}
+                aria-label={t('Actions for {name}', { name: participant.name })}
                 className="grid h-7 w-7 place-items-center rounded-lg bg-black/45 text-white/85 backdrop-blur-sm transition-colors hover:bg-black/65 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <MoreVertical className="h-4 w-4" />
@@ -168,19 +170,19 @@ export function VideoTile({
               <DropdownMenuLabel>{participant.name}</DropdownMenuLabel>
               <DropdownMenuItem disabled={!participant.micOn} onSelect={() => hostMuteParticipant(participant.id)}>
                 <MicOff className="h-4 w-4" />
-                Mute mic
+                {t('Mute mic')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!participant.cameraOn}
                 onSelect={() => hostDisableCamera(participant.id)}
               >
                 <VideoOff className="h-4 w-4" />
-                Turn off camera
+                {t('Turn off camera')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem destructive onSelect={() => hostRemoveParticipant(participant.id)}>
                 <Trash className="h-4 w-4" />
-                Remove from room
+                {t('Remove from room')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

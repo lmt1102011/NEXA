@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar } from '@/components/ui/avatar'
+import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
 import { hostEndRoom, hostLeaveWithDelegate, leaveRoom } from '@/features/room/session/sessionController'
@@ -25,6 +26,7 @@ export function LeaveDialog() {
   const participants = useRoomSessionStore((state) => state.participants)
   const participantCount = useRoomSessionStore((state) => state.participants.length)
   const navigate = useNavigate()
+  const t = useT()
 
   const [pickMode, setPickMode] = useState(false)
   const [delegateId, setDelegateId] = useState<string | null>(null)
@@ -81,10 +83,10 @@ export function LeaveDialog() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ArrowRight className="h-4 w-4 text-accent" />
-                Who takes over this room?
+                {t('Who takes over this room?')}
               </DialogTitle>
               <DialogDescription>
-                Pick the new host and, if you want, leave a note for the room before you step out.
+                {t('Pick the new host and, if you want, leave a note for the room before you step out.')}
               </DialogDescription>
             </DialogHeader>
 
@@ -105,7 +107,7 @@ export function LeaveDialog() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] font-medium text-ink">{participant.name}</span>
                       <span className="block text-[12px] text-ink-subtle">
-                        {participant.role === 'host' ? 'Host' : 'Guest'}
+                        {participant.role === 'host' ? t('Host') : t('Guest')}
                       </span>
                     </span>
                     <span
@@ -120,13 +122,13 @@ export function LeaveDialog() {
               </div>
 
               <label className="mt-4 block text-[12.5px] font-medium text-ink-muted" htmlFor="handoff-note">
-                Note for the room (optional)
+                {t('Note for the room (optional)')}
               </label>
               <Input
                 id="handoff-note"
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                placeholder="e.g. I'll be back in 10 minutes…"
+                placeholder={t("e.g. I'll be back in 10 minutes…")}
                 maxLength={140}
                 className="mt-1.5"
               />
@@ -134,11 +136,11 @@ export function LeaveDialog() {
 
             <DialogFooter>
               <Button variant="secondary" onClick={() => setPickMode(false)}>
-                Back
+                {t('Back')}
               </Button>
               <Button variant="danger" onClick={handleConfirmDelegate}>
                 <LogOut className="h-4 w-4" />
-                Transfer & leave
+                {t('Transfer & leave')}
               </Button>
             </DialogFooter>
           </>
@@ -147,12 +149,15 @@ export function LeaveDialog() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <PhoneOff className="h-4 w-4 text-danger" />
-                Leave “{room?.name ?? 'room'}”?
+                {t('Leave “{name}”?', { name: room?.name ?? 'room' })}
               </DialogTitle>
               <DialogDescription>
                 {isHost
-                  ? `You are the host of ${participantCount} ${participantCount === 1 ? 'person' : 'people'}. End the room for everyone, or hand it off and step out yourself.`
-                  : 'Your camera and microphone will turn off right away. The room keeps going without you.'}
+                  ? t(
+                      'You are the host of {count} people. End the room for everyone, or hand it off and step out yourself.',
+                      { count: participantCount },
+                    )
+                  : t('Your camera and microphone will turn off right away. The room keeps going without you.')}
               </DialogDescription>
             </DialogHeader>
 
@@ -167,10 +172,9 @@ export function LeaveDialog() {
                     <PowerOff className="h-4 w-4" />
                   </span>
                   <span>
-                    <span className="block text-[13.5px] font-medium text-danger">End room for everyone</span>
+                    <span className="block text-[13.5px] font-medium text-danger">{t('End room for everyone')}</span>
                     <span className="block text-[12px] text-ink-subtle">
-                      Disconnects all {participantCount} {participantCount === 1 ? 'person' : 'people'} and closes the
-                      room.
+                      {t('Disconnects all {count} people and closes the room.', { count: participantCount })}
                     </span>
                   </span>
                 </button>
@@ -186,12 +190,12 @@ export function LeaveDialog() {
                 </span>
                 <span>
                   <span className="block text-[13.5px] font-medium text-ink">
-                    {isHost ? 'Leave only me' : 'Leave room'}
+                    {isHost ? t('Leave only me') : t('Leave room')}
                   </span>
                   <span className="block text-[12px] text-ink-subtle">
                     {isHost
-                      ? 'Hand the room to someone else and step out yourself.'
-                      : 'You can rejoin later if the room is still open.'}
+                      ? t('Hand the room to someone else and step out yourself.')
+                      : t('You can rejoin later if the room is still open.')}
                   </span>
                 </span>
               </button>
@@ -200,7 +204,7 @@ export function LeaveDialog() {
             <DialogFooter>
               <Button variant="secondary" onClick={close}>
                 <Users className="h-4 w-4" />
-                Stay in room
+                {t('Stay in room')}
               </Button>
             </DialogFooter>
           </>

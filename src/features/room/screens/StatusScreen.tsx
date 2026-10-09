@@ -3,8 +3,10 @@ import { AlertTriangle, Lock, Loader2, PhoneOff, SearchX, UserX, Users } from 'l
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useRoomSessionStore } from '@/stores/roomSession'
+import { useT, type TranslationVars } from '@/lib/i18n'
 
 export function RoomLoading() {
+  const t = useT()
   return (
     <div className="grid min-h-dvh place-items-center bg-bg px-4">
       <div className="flex flex-col items-center gap-4 text-center">
@@ -12,8 +14,8 @@ export function RoomLoading() {
           <Loader2 className="h-5 w-5 animate-spin text-accent" />
         </span>
         <div>
-          <p className="text-[15px] font-medium text-ink">Opening room…</p>
-          <p className="mt-1 text-[13px] text-ink-subtle">Fetching room details and checking access.</p>
+          <p className="text-[15px] font-medium text-ink">{t('Opening room…')}</p>
+          <p className="mt-1 text-[13px] text-ink-subtle">{t('Fetching room details and checking access.')}</p>
         </div>
       </div>
     </div>
@@ -21,13 +23,14 @@ export function RoomLoading() {
 }
 
 export default function RoomStatusScreen() {
+  const t = useT()
   const navigate = useNavigate()
   const status = useRoomSessionStore((state) => state.status)
   const statusDetail = useRoomSessionStore((state) => state.statusDetail)
   const room = useRoomSessionStore((state) => state.room)
   const setStatus = useRoomSessionStore((state) => state.setStatus)
 
-  const config = getStatusConfig(status, statusDetail)
+  const config = getStatusConfig(status, statusDetail, t)
 
   return (
     <div className="grid min-h-dvh place-items-center bg-bg px-4 py-10">
@@ -62,7 +65,7 @@ export default function RoomStatusScreen() {
             className="w-full sm:w-auto"
             onClick={() => navigate(config.home ? '/' : '/rooms')}
           >
-            {config.home ? 'Back to Home' : 'Browse other rooms'}
+            {config.home ? t('Back to Home') : t('Browse other rooms')}
           </Button>
         </div>
 
@@ -71,58 +74,58 @@ export default function RoomStatusScreen() {
           className="mt-4 text-[13px] text-ink-subtle underline-offset-4 transition-colors hover:text-ink hover:underline"
           onClick={() => navigate('/rooms')}
         >
-          Or pick another live room
+          {t('Or pick another live room')}
         </button>
       </div>
     </div>
   )
 }
 
-function getStatusConfig(status: string, detail: string) {
+function getStatusConfig(status: string, detail: string, t: (key: string, vars?: TranslationVars) => string) {
   switch (status) {
     case 'not-found':
       return {
         icon: <SearchX className="h-6 w-6" />,
-        title: 'Room not found',
-        description: 'This room may have been deleted, or the link is incorrect.',
+        title: t('Room not found'),
+        description: t('This room may have been deleted, or the link is incorrect.'),
         home: true,
       }
     case 'full':
       return {
         icon: <Users className="h-6 w-6" />,
-        title: 'Room is full',
-        description: `Every seat is taken right now. Try again in a moment, or browse other public rooms.`,
+        title: t('Room is full'),
+        description: t('Every seat is taken right now. Try again in a moment, or browse other public rooms.'),
         home: false,
       }
     case 'locked':
       return {
         icon: <Lock className="h-6 w-6" />,
-        title: 'Room is locked',
-        description: 'The host locked this room. Ask them to let you in, or try again later.',
+        title: t('Room is locked'),
+        description: t('The host locked this room. Ask them to let you in, or try again later.'),
         home: false,
       }
     case 'rejected':
       return {
         icon: <UserX className="h-6 w-6" />,
-        title: 'Request declined',
-        description: detail || 'The host declined your request to join this room.',
+        title: t('Request declined'),
+        description: detail || t('The host declined your request to join this room.'),
         home: true,
-        retry: 'Try again',
+        retry: t('Try again'),
       }
     case 'ended':
       return {
         icon: <PhoneOff className="h-6 w-6" />,
-        title: 'Room has ended',
-        description: 'The host ended this room. Everyone has been disconnected.',
+        title: t('Room has ended'),
+        description: t('The host ended this room. Everyone has been disconnected.'),
         home: true,
       }
     default:
       return {
         icon: <AlertTriangle className="h-6 w-6" />,
-        title: 'Something went wrong',
-        description: detail || 'We could not open this room. Please try again.',
+        title: t('Something went wrong'),
+        description: detail || t('We could not open this room. Please try again.'),
         home: true,
-        retry: 'Try again',
+        retry: t('Try again'),
       }
   }
 }

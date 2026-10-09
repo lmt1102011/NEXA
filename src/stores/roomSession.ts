@@ -12,6 +12,7 @@ import type {
   TodoItem,
 } from '@/types'
 import { mergeRoomSettings, type RoomSettingsPatch } from '@/lib/defaults'
+import { t } from '@/lib/i18n'
 import { useRoomsStore } from '@/stores/rooms'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
@@ -135,7 +136,7 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
       participants: [self],
       requests: loadPersistedRequests(room.id),
     })
-    pushSystemMessage(room, `${self.name} created the room`)
+    pushSystemMessage(room, t('{name} created the room', { name: self.name }))
     return 'joined'
   },
 
@@ -162,7 +163,7 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
         ? state.participants
         : [...state.participants, self],
     }))
-    pushSystemMessage(room, `${self.name} was accepted by the host`)
+    pushSystemMessage(room, t('{name} was accepted by the host', { name: self.name }))
     useRoomsStore.getState().updateMeta(room.id, {
       participantCount: get().participants.length,
     })
@@ -191,7 +192,7 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
         return state
       }
       if (!participant.isSelf) {
-        queueSystemMessage(state.room, `${participant.name} joined the room`)
+        queueSystemMessage(state.room, t('{name} joined the room', { name: participant.name }))
       }
       const participants = [...state.participants, participant]
       if (state.room) {
@@ -205,7 +206,7 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
       const target = state.participants.find((p) => p.id === id)
       if (!target || target.isSelf) return state
       const participants = state.participants.filter((p) => p.id !== id)
-      queueSystemMessage(state.room, `${target.name} left the room`)
+      queueSystemMessage(state.room, t('{name} left the room', { name: target.name }))
       if (state.room) {
         useRoomsStore.getState().updateMeta(state.room.id, { participantCount: participants.length })
       }

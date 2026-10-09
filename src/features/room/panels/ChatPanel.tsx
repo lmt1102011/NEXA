@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Download, FileText, Paperclip, Pin, SendHorizontal, SmilePlus, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { Avatar } from '@/components/ui/avatar'
 import { IconSmile } from '@/components/ui/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -34,6 +35,7 @@ export function ChatPanel() {
   const markRead = useRoomSessionStore((state) => state.markRead)
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
+  const t = useT()
 
   const [draft, setDraft] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
@@ -73,8 +75,8 @@ export function ChatPanel() {
       <div className="flex h-full items-center justify-center">
         <EmptyState
           icon={<SmilePlus className="h-5 w-5" />}
-          title="Chat is turned off"
-          description="The host disabled chat for this room."
+          title={t('Chat is turned off')}
+          description={t('The host disabled chat for this room.')}
         />
       </div>
     )
@@ -87,7 +89,7 @@ export function ChatPanel() {
           <Pin className="h-3.5 w-3.5 shrink-0 text-accent" />
           <p className="min-w-0 flex-1 truncate text-[12.5px] text-ink">
             <span className="font-medium">
-              {pinnedMessage.senderId === self?.id ? 'You' : pinnedMessage.senderName}:
+              {pinnedMessage.senderId === self?.id ? t('You') : pinnedMessage.senderName}:
             </span>{' '}
             {pinnedMessage.kind === 'file' && pinnedMessage.file ? pinnedMessage.file.name : pinnedMessage.text}
           </p>
@@ -96,7 +98,7 @@ export function ChatPanel() {
           pinnedMessage.senderId === self?.id ? (
             <button
               type="button"
-              aria-label="Unpin message"
+              aria-label={t('Unpin message')}
               onClick={() => pinMessage(null)}
               className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
             >
@@ -110,8 +112,8 @@ export function ChatPanel() {
         {messages.length === 0 ? (
           <EmptyState
             icon={<SendHorizontal className="h-5 w-5" />}
-            title="No messages yet"
-            description="Say hi — messages are visible to everyone in the room."
+            title={t('No messages yet')}
+            description={t('Say hi — messages are visible to everyone in the room.')}
             className="py-10"
           />
         ) : (
@@ -122,7 +124,7 @@ export function ChatPanel() {
       {unread > 0 ? (
         <div className="relative">
           <div className="absolute -top-9 left-1/2 -translate-x-1/2 rounded-full bg-accent-solid px-3 py-1 text-[11.5px] font-medium text-white shadow-md">
-            {unread} new {unread === 1 ? 'message' : 'messages'}
+            {t('{count} new messages', { count: unread })}
           </div>
         </div>
       ) : null}
@@ -143,7 +145,7 @@ export function ChatPanel() {
               />
               <button
                 type="button"
-                aria-label="Attach file"
+                aria-label={t('Attach file')}
                 onClick={() => fileRef.current?.click()}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
               >
@@ -162,14 +164,14 @@ export function ChatPanel() {
               }
             }}
             rows={1}
-            placeholder="Send a message…"
-            aria-label="Message"
+            placeholder={t('Send a message…')}
+            aria-label={t('Message')}
             className="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-[13.5px] text-ink placeholder:text-ink-subtle focus:outline-none"
           />
 
           <button
             type="button"
-            aria-label="Send message"
+            aria-label={t('Send message')}
             disabled={!draft.trim()}
             onClick={submit}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-solid text-white transition-colors hover:bg-accent-solid-hover disabled:pointer-events-none disabled:opacity-40"
@@ -185,6 +187,7 @@ export function ChatPanel() {
 function ChatRow({ message }: { message: ChatMessage }) {
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
+  const t = useT()
 
   if (message.kind === 'system') {
     return (
@@ -211,7 +214,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
 
       <div className={cn('min-w-0 max-w-[80%]', own && 'flex flex-col items-end')}>
         <div className={cn('flex items-baseline gap-2', own && 'flex-row-reverse')}>
-          <span className="text-[12px] font-medium text-ink-muted">{own ? 'You' : message.senderName}</span>
+          <span className="text-[12px] font-medium text-ink-muted">{own ? t('You') : message.senderName}</span>
           <span className="font-mono text-[10.5px] text-ink-subtle">{formatTime(message.createdAt)}</span>
         </div>
 
@@ -265,7 +268,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                aria-label="Add reaction"
+                aria-label={t('Add reaction')}
                 className="grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 text-ink-subtle opacity-0 transition-opacity hover:text-ink focus:opacity-100 group-hover:opacity-100"
               >
                 <IconSmile className="h-3.5 w-3.5" />
@@ -288,7 +291,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
           {canPin ? (
             <button
               type="button"
-              aria-label={isPinned ? 'Unpin message' : 'Pin message'}
+              aria-label={isPinned ? t('Unpin message') : t('Pin message')}
               onClick={() => pinMessage(isPinned ? null : message)}
               className={cn(
                 'grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 transition-colors hover:text-ink focus:opacity-100 group-hover:opacity-100',

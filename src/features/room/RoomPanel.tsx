@@ -1,5 +1,6 @@
 import { Clapperboard, MessageSquare, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { t, useT } from '@/lib/i18n'
 import { useUiStore } from '@/stores/ui'
 import { ChatPanel } from '@/features/room/panels/ChatPanel'
 import { ParticipantsPanel } from '@/features/room/panels/ParticipantsPanel'
@@ -7,11 +8,12 @@ import { ActivitiesPanel } from '@/features/room/panels/ActivitiesPanel'
 import type { RoomPanel as RoomPanelKey } from '@/types'
 
 const TABS: { key: RoomPanelKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
-  { key: 'activities', label: 'Activities', icon: <Clapperboard className="h-4 w-4" /> },
+  { key: 'chat', label: t('Chat'), icon: <MessageSquare className="h-4 w-4" /> },
+  { key: 'activities', label: t('Activities'), icon: <Clapperboard className="h-4 w-4" /> },
 ]
 
 export function RoomPanel({ className, embedded = true }: { className?: string; embedded?: boolean }) {
+  const t = useT()
   const panel = useUiStore((state) => state.panel)
   const setPanel = useUiStore((state) => state.setPanel)
   const active: RoomPanelKey = panel && panel !== 'settings' ? panel : 'chat'
@@ -39,7 +41,7 @@ export function RoomPanel({ className, embedded = true }: { className?: string; 
         {embedded ? (
           <button
             type="button"
-            aria-label="Close panel"
+            aria-label={t('Close panel')}
             onClick={() => setPanel(null)}
             className="grid h-8 w-8 place-items-center rounded-lg text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
           >

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MonitorUp, UserPlus, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { mediaEngine } from '@/services/media/MediaEngine'
@@ -64,6 +65,7 @@ function SharingLayout({ participants }: { participants: Participant[] }) {
 }
 
 function ScreenTile() {
+  const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const sharing = useCallStore((state) => state.sharing)
 
@@ -81,13 +83,14 @@ function ScreenTile() {
 
       <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1 text-[11.5px] font-medium text-white backdrop-blur">
         <MonitorUp className="h-3.5 w-3.5" />
-        You are presenting
+        {t('You are presenting')}
       </span>
     </div>
   )
 }
 
 function JoinRequestBanner() {
+  const t = useT()
   const requests = useRoomSessionStore((state) => state.requests)
   const self = useRoomSessionStore((state) => state.self)
   const setPanel = useUiStore((state) => state.setPanel)
@@ -108,7 +111,9 @@ function JoinRequestBanner() {
         >
           <div className="flex items-center gap-2 text-[12px] font-medium text-warning">
             <Users className="h-3.5 w-3.5" />
-            {requests.length === 1 ? '1 person wants to join' : `${requests.length} people want to join`}
+            {requests.length === 1
+              ? t('1 person wants to join')
+              : t('{count} people want to join', { count: requests.length })}
           </div>
 
           <div className="mt-2.5 flex items-center gap-3">
@@ -116,8 +121,9 @@ function JoinRequestBanner() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-ink">{visible.name}</p>
               <p className="text-[12px] text-ink-subtle">
-                {visible.micOn ? 'Mic on' : 'Mic off'} · {visible.cameraOn ? 'camera on' : 'camera off'}
-                {extra > 0 ? ` · +${extra} more waiting` : ''}
+                {visible.micOn ? t('Mic on') : t('Mic off')} ·{' '}
+                {visible.cameraOn ? t('camera on') : t('camera off')}
+                {extra > 0 ? ` · ${t('+{count} more waiting', { count: extra })}` : ''}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -125,13 +131,13 @@ function JoinRequestBanner() {
                 size="sm"
                 variant="ghost"
                 onClick={() => rejectRequest(visible.id)}
-                aria-label={`Decline ${visible.name}`}
+                aria-label={t('Decline {name}', { name: visible.name })}
               >
-                Decline
+                {t('Decline')}
               </Button>
               <Button size="sm" onClick={() => acceptRequest(visible.id)}>
                 <UserPlus className="h-4 w-4" />
-                Accept
+                {t('Accept')}
               </Button>
             </div>
           </div>
@@ -142,7 +148,7 @@ function JoinRequestBanner() {
               className="mt-2.5 w-full rounded-lg border border-line bg-surface-2 py-1.5 text-[12.5px] text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink"
               onClick={() => setPanel('participants')}
             >
-              Review all requests in People
+              {t('Review all requests in People')}
             </button>
           ) : null}
         </motion.div>

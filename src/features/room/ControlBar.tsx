@@ -13,6 +13,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/feedback'
 import { useBreakpoint } from '@/hooks'
 import { useCallStore } from '@/stores/call'
@@ -117,6 +118,7 @@ function MobileControl({ item }: { item: ControlItem }) {
 }
 
 export function ControlBar() {
+  const t = useT()
   const { isMobile } = useBreakpoint()
 
   const panel = useUiStore((state) => state.panel)
@@ -145,72 +147,72 @@ export function ControlBar() {
     {
       key: 'mic',
       icon: micAvailable ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />,
-      label: micAvailable ? 'Mute' : 'Unmute',
+      label: micAvailable ? t('Mute') : t('Unmute'),
       tone: micAvailable ? 'default' : 'muted',
       shortcut: 'M',
-      ariaLabel: micAvailable ? 'Mute microphone' : 'Unmute microphone',
+      ariaLabel: micAvailable ? t('Mute microphone') : t('Unmute microphone'),
       onClick: () => void toggleMic(),
     },
     {
       key: 'camera',
       icon: camAvailable ? <Camera className="h-[18px] w-[18px]" /> : <CameraOff className="h-[18px] w-[18px]" />,
-      label: camAvailable ? 'Stop video' : 'Start video',
+      label: camAvailable ? t('Stop video') : t('Start video'),
       tone: camAvailable ? 'default' : 'muted',
       shortcut: 'V',
-      ariaLabel: camAvailable ? 'Turn camera off' : 'Turn camera on',
+      ariaLabel: camAvailable ? t('Turn camera off') : t('Turn camera on'),
       onClick: () => void toggleCamera(),
     },
     {
       key: 'share',
       icon: <MonitorUp className="h-[18px] w-[18px]" />,
-      label: sharing ? 'Stop share' : 'Share',
+      label: sharing ? t('Stop share') : t('Share'),
       tone: sharing ? 'danger' : 'default',
       danger: sharing,
       active: sharing,
       shortcut: 'S',
-      ariaLabel: sharing ? 'Stop screen sharing' : 'Share your screen',
+      ariaLabel: sharing ? t('Stop screen sharing') : t('Share your screen'),
       onClick: () => void toggleScreenShare(),
     },
     { key: 'divider-1', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {
       key: 'chat',
       icon: <MessageSquare className="h-[18px] w-[18px]" />,
-      label: 'Chat',
+      label: t('Chat'),
       active: panel === 'chat',
       badge: unread,
       shortcut: 'C',
-      ariaLabel: 'Open chat',
+      ariaLabel: t('Open chat'),
       onClick: () => setPanel('chat'),
     },
     {
       key: 'activities',
       icon: <Clapperboard className="h-[18px] w-[18px]" />,
-      label: 'Activities',
+      label: t('Activities'),
       active: panel === 'activities',
       dot: activitiesUnread > 0 && panel !== 'activities',
-      ariaLabel: 'Open room activities',
+      ariaLabel: t('Open room activities'),
       onClick: () => setPanel('activities'),
     },
     { key: 'divider-2', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {
       key: 'devices',
       icon: <Settings className="h-[18px] w-[18px]" />,
-      label: 'Devices',
-      ariaLabel: 'Device settings',
+      label: t('Devices'),
+      ariaLabel: t('Device settings'),
       onClick: () => setModal('devices'),
     },
     {
       key: 'invite',
       icon: <UserPlus className="h-[18px] w-[18px]" />,
-      label: 'Invite',
-      ariaLabel: 'Invite people',
+      label: t('Invite'),
+      ariaLabel: t('Invite people'),
       onClick: () => setModal('invite'),
     },
     {
       key: 'shortcuts',
       icon: <Keyboard className="h-[18px] w-[18px]" />,
-      label: 'Keys',
-      ariaLabel: 'Keyboard shortcuts',
+      label: t('Keys'),
+      ariaLabel: t('Keyboard shortcuts'),
       onClick: () => setShortcutsOpen(true),
     },
   ]
@@ -218,9 +220,9 @@ export function ControlBar() {
   const leaveItem: ControlItem = {
     key: 'leave',
     icon: <PhoneOff className="h-[18px] w-[18px]" />,
-    label: 'Leave',
+    label: t('Leave'),
     tone: 'danger',
-    ariaLabel: 'Leave room',
+    ariaLabel: t('Leave room'),
     danger: true,
     onClick: () => setModal('leave'),
   }
@@ -228,9 +230,9 @@ export function ControlBar() {
   const moreItem: ControlItem = {
     key: 'more',
     icon: <Ellipsis className="h-[19px] w-[19px]" />,
-    label: 'More',
+    label: t('More'),
     badge: requests,
-    ariaLabel: 'More options',
+    ariaLabel: t('More options'),
     onClick: () => setModal('more'),
   }
 
@@ -252,8 +254,10 @@ export function ControlBar() {
     <div className="relative z-20 flex h-[76px] shrink-0 items-center border-t border-line bg-surface/85 px-4 backdrop-blur">
       <div className="flex flex-1 justify-start">
         <span className="hidden items-center gap-2 text-[12.5px] text-ink-subtle xl:flex">
-          {room?.visibility === 'private' ? 'Private room' : 'Public room'} ·{' '}
-          {self?.role === 'host' ? 'You are the host' : `Hosted by ${room?.hostName ?? ''}`}
+          {room?.visibility === 'private' ? t('Private room') : t('Public room')} ·{' '}
+          {self?.role === 'host'
+            ? t('You are the host')
+            : t('Hosted by {name}', { name: room?.hostName ?? '' })}
         </span>
       </div>
 

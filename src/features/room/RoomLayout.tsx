@@ -3,6 +3,7 @@ import { Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useBreakpoint, useHotkeys } from '@/hooks'
 import { useConnectionMonitor } from '@/hooks/useConnectionMonitor'
+import { t, useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useRoomsStore } from '@/stores/rooms'
 import { useDirectoryStore } from '@/stores/directory'
@@ -26,13 +27,14 @@ import RoomStatusScreen, { RoomLoading } from '@/features/room/screens/StatusScr
 import type { RoomPanel as RoomPanelKey } from '@/types'
 
 const PANEL_TITLES: Record<RoomPanelKey, string> = {
-  chat: 'Chat',
-  participants: 'Participants',
-  activities: 'Activities',
-  settings: 'Room settings',
+  chat: t('Chat'),
+  participants: t('Participants'),
+  activities: t('Activities'),
+  settings: t('Room settings'),
 }
 
 export default function RoomLayout() {
+  const t = useT()
   const { roomId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const status = useRoomSessionStore((state) => state.status)
@@ -124,7 +126,7 @@ export default function RoomLayout() {
           <SheetContent
             side="bottom"
             title={PANEL_TITLES[panel]}
-            description={panel === 'chat' ? 'Messages for everyone in the room.' : undefined}
+            description={panel === 'chat' ? t('Messages for everyone in the room.') : undefined}
             className="flex flex-col"
           >
             <div className="-mx-5 -mb-5 h-[72dvh] shrink-0">

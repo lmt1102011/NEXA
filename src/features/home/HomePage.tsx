@@ -5,6 +5,7 @@ import { ArrowRight, Radio, Search, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LiveDot } from '@/components/ui/badge'
+import { useT } from '@/lib/i18n'
 import { usePublicRooms } from '@/features/rooms/usePublicRooms'
 import { RoomCard, RoomCardSkeleton } from '@/features/rooms/RoomCard'
 
@@ -14,6 +15,7 @@ const heroMotion = {
 }
 
 export default function HomePage() {
+  const t = useT()
   const rooms = usePublicRooms()
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -62,7 +64,7 @@ export default function HomePage() {
             <motion.div variants={heroMotion} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
               <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-3 py-1 text-[12.5px] text-ink-muted backdrop-blur-sm">
                 <LiveDot />
-                {stats.people} people online in {stats.roomCount} rooms
+                {t('{count} people online in {rooms} rooms', { count: stats.people, rooms: stats.roomCount })}
               </span>
             </motion.div>
 
@@ -79,7 +81,7 @@ export default function HomePage() {
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="mt-4 text-xl font-medium text-ink sm:text-2xl"
             >
-              Talk. Share. Connect.
+              {t('Talk. Share. Connect.')}
             </motion.p>
 
             <motion.p
@@ -87,7 +89,7 @@ export default function HomePage() {
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="nx-text-balance mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-ink-muted"
             >
-              Create a room, share a link, and start talking. No account required.
+              {t('Create a room, share a link, and start talking. No account required.')}
             </motion.p>
 
             <motion.div
@@ -97,14 +99,14 @@ export default function HomePage() {
             >
               <Link to="/create" className="w-full sm:w-auto">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Create Room
+                  {t('Create Room')}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link to="/rooms" className="w-full sm:w-auto">
                 <Button variant="secondary" size="lg" className="w-full sm:w-auto">
                   <Search className="h-4 w-4" />
-                  Find a Room
+                  {t('Find a Room')}
                 </Button>
               </Link>
             </motion.div>
@@ -114,7 +116,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               className="mt-5 text-[12.5px] text-ink-subtle"
             >
-              Works in your browser · Desktop & mobile · No download
+              {t('Works in your browser · Desktop & mobile · No download')}
             </motion.p>
           </motion.div>
         </div>
@@ -125,10 +127,10 @@ export default function HomePage() {
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-ink">
               <Radio className="h-4.5 w-4.5 text-accent" />
-              Active Public Rooms
+              {t('Active Public Rooms')}
             </h2>
             <p className="mt-1 text-[13.5px] text-ink-subtle">
-              Jump into a live room, or search by name or room code.
+              {t('Jump into a live room, or search by name or room code.')}
             </p>
           </div>
           <div className="relative w-full sm:w-72">
@@ -136,8 +138,8 @@ export default function HomePage() {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search rooms..."
-              aria-label="Search rooms"
+              placeholder={t('Search rooms...')}
+              aria-label={t('Search rooms')}
               className="pl-10"
             />
           </div>
@@ -151,10 +153,10 @@ export default function HomePage() {
 
         {!loading && visibleRooms.length === 0 ? (
           <div className="mt-6 rounded-2xl border border-dashed border-line py-12 text-center">
-            <p className="text-[14px] text-ink-muted">No rooms match “{query}”.</p>
+            <p className="text-[14px] text-ink-muted">{t('No rooms match “{query}”.', { query })}</p>
             <Link to="/rooms" className="mt-3 inline-block">
               <Button variant="secondary" size="sm">
-                Browse all rooms
+                {t('Browse all rooms')}
               </Button>
             </Link>
           </div>
@@ -164,7 +166,7 @@ export default function HomePage() {
           <div className="mt-7 flex justify-center">
             <Link to="/rooms">
               <Button variant="ghost">
-                View all rooms
+                {t('View all rooms')}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -176,16 +178,16 @@ export default function HomePage() {
         <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-14 sm:grid-cols-3 sm:px-6">
           {[
             {
-              title: 'Create in seconds',
-              body: 'Name your room, pick visibility, share the link. Guests join without an account.',
+              title: t('Create in seconds'),
+              body: t('Name your room, pick visibility, share the link. Guests join without an account.'),
             },
             {
-              title: 'Host controls',
-              body: 'Approve join requests, mute, remove, lock the room or transfer hosting anytime.',
+              title: t('Host controls'),
+              body: t('Approve join requests, mute, remove, lock the room or transfer hosting anytime.'),
             },
             {
-              title: 'Built for clarity',
-              body: 'Adaptive video grid, connection radar, low bandwidth mode and crisp room chat.',
+              title: t('Built for clarity'),
+              body: t('Adaptive video grid, connection radar, low bandwidth mode and crisp room chat.'),
             },
           ].map((item) => (
             <div key={item.title}>
