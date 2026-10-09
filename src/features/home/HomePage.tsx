@@ -68,13 +68,16 @@ export default function HomePage() {
               </span>
             </motion.div>
 
-            <motion.h1
+            <motion.img
               variants={heroMotion}
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-6 text-[clamp(3.2rem,11vw,5.5rem)] font-semibold leading-[0.95] tracking-[0.06em] text-ink"
-            >
-              NEXA
-            </motion.h1>
+              src="/brand/nexa-logo.svg"
+              alt="NEXA Call"
+              draggable={false}
+              width={811}
+              height={202}
+              className="mx-auto mt-7 h-auto w-full max-w-[460px] select-none rounded-2xl border border-line shadow-[0_18px_50px_-24px_rgba(67,136,255,0.55)]"
+            />
 
             <motion.p
               variants={heroMotion}
