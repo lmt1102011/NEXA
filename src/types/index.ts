@@ -204,6 +204,7 @@ export type SessionStatus =
   | 'awaiting'
   | 'joined'
   | 'rejected'
+  | 'kicked'
   | 'locked'
   | 'full'
   | 'not-found'

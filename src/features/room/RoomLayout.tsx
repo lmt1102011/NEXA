@@ -11,8 +11,8 @@ import { useUiStore } from '@/stores/ui'
 import { roomFromInviteParams } from '@/lib/invite'
 import { initRoom, markEnteredViaRoomLink, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
 import { RoomHeader } from '@/features/room/RoomHeader'
-import { RoomRail } from '@/features/room/RoomRail'
 import { NameConflictBar } from '@/features/room/NameConflictBar'
+import { useTimerAlert } from '@/features/room/activities/useTimerAlert'
 import { RoomPanel } from '@/features/room/RoomPanel'
 import RoomStage from '@/features/room/RoomStage'
 import { ControlBar } from '@/features/room/ControlBar'
@@ -98,6 +98,7 @@ export default function RoomLayout() {
   }, [roomId, searchParams.toString()])
 
   useConnectionMonitor(status === 'joined')
+  useTimerAlert()
 
   useEffect(() => {
     if (status === 'joined') return
@@ -138,8 +139,6 @@ export default function RoomLayout() {
       <NameConflictBar />
 
       <div className="flex min-h-0 flex-1">
-        <RoomRail />
-
         <div className="relative min-w-0 flex-1 overflow-hidden">
           <RoomStage />
           <Outlet />

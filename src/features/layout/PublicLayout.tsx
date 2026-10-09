@@ -27,10 +27,11 @@ export default function PublicLayout() {
       >
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link to="/" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={t('NEXA home')}>
-            <Logo />
+            <Logo className="hidden sm:inline-flex" />
+            <Logo wordmark={false} className="sm:hidden" />
           </Link>
 
-          <nav className="flex items-center gap-1" aria-label={t('Main')}>
+          <nav className="hidden min-[360px]:flex items-center gap-1" aria-label={t('Main')}>
             <NavLink to="/rooms" className={({ isActive }) => navLinkClass(isActive)}>
               {t('Rooms')}
             </NavLink>

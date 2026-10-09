@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Download, FileText, Paperclip, Pin, SendHorizontal, SmilePlus, X } from 'lucide-react'
+import { Check, ClipboardCopy, Download, FileText, Paperclip, Pin, SendHorizontal, SmilePlus, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
+import { useCopy } from '@/hooks'
 import { Avatar } from '@/components/ui/avatar'
 import { IconSmile } from '@/components/ui/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -188,6 +189,21 @@ function ChatRow({ message }: { message: ChatMessage }) {
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
   const t = useT()
+  const { copied, copy } = useCopy()
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const pressTimer = useRef<number | null>(null)
+
+  function startPress() {
+    if (pressTimer.current !== null) return
+    pressTimer.current = window.setTimeout(() => setActionsOpen(true), 480)
+  }
+
+  function cancelPress() {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
 
   if (message.kind === 'system') {
     return (
@@ -202,6 +218,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
   const mineActive = (emoji: string) => (message.reactions[emoji] ?? []).includes(self?.id ?? '')
   const canPin = own || self?.role === 'host' || Boolean(self?.permissions?.canModerate)
   const isPinned = pinnedMessage?.id === message.id
+  const bubbleText = message.kind === 'file' && message.file ? message.file.name : message.text
 
   return (
     <motion.div
@@ -209,6 +226,11 @@ function ChatRow({ message }: { message: ChatMessage }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
       className={cn('group flex gap-2.5', own && 'flex-row-reverse')}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return
+        cancelPress()
+        setActionsOpen(false)
+      }}
     >
       <Avatar name={message.senderName} color={message.avatarColor} size="sm" className="mt-0.5" />
 
@@ -219,8 +241,16 @@ function ChatRow({ message }: { message: ChatMessage }) {
         </div>
 
         <div
+          onTouchStart={startPress}
+          onTouchEnd={cancelPress}
+          onTouchMove={cancelPress}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            cancelPress()
+            setActionsOpen((open) => !open)
+          }}
           className={cn(
-            'mt-1 rounded-xl px-3 py-2 text-[13.5px] leading-relaxed',
+            'mt-1 rounded-xl px-3 py-2 text-[13.5px] leading-relaxed select-none',
             own ? 'rounded-tr-sm bg-accent-soft text-ink' : 'rounded-tl-sm border border-line bg-surface-2 text-ink',
           )}
         >
@@ -242,9 +272,42 @@ function ChatRow({ message }: { message: ChatMessage }) {
               <Download className="ml-auto h-4 w-4 shrink-0 text-ink-subtle" />
             </a>
           ) : (
-            <span className="whitespace-pre-wrap break-words">{message.text}</span>
+            <span className="whitespace-pre-wrap break-words select-text">{message.text}</span>
           )}
         </div>
+
+        {actionsOpen ? (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn('mt-1.5 flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-md', own && 'flex-row-reverse')}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                void copy(bubbleText)
+                setActionsOpen(false)
+              }}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-ink transition-colors hover:bg-surface-3"
+            >
+              {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+              {copied ? t('Copied') : t('Copy')}
+            </button>
+            {canPin ? (
+              <button
+                type="button"
+                onClick={() => {
+                  pinMessage(isPinned ? null : message)
+                  setActionsOpen(false)
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-ink transition-colors hover:bg-surface-3"
+              >
+                <Pin className={cn('h-3.5 w-3.5', isPinned ? 'text-accent' : '')} />
+                {isPinned ? t('Unpin') : t('Pin')}
+              </button>
+            ) : null}
+          </motion.div>
+        ) : null}
 
         <div className={cn('mt-1 flex flex-wrap items-center gap-1.5', own && 'flex-row-reverse')}>
           {reactionEntries.map(([emoji, users]) => (
@@ -269,7 +332,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
               <button
                 type="button"
                 aria-label={t('Add reaction')}
-                className="grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 text-ink-subtle opacity-0 transition-opacity hover:text-ink focus:opacity-100 group-hover:opacity-100"
+                className="grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 text-ink-subtle transition-opacity hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
               >
                 <IconSmile className="h-3.5 w-3.5" />
               </button>
@@ -294,10 +357,10 @@ function ChatRow({ message }: { message: ChatMessage }) {
               aria-label={isPinned ? t('Unpin message') : t('Pin message')}
               onClick={() => pinMessage(isPinned ? null : message)}
               className={cn(
-                'grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 transition-colors hover:text-ink focus:opacity-100 group-hover:opacity-100',
+                'grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 transition-colors hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100',
                 isPinned
                   ? 'border-accent/50 bg-accent-soft text-accent opacity-100'
-                  : 'text-ink-subtle opacity-0',
+                  : 'text-ink-subtle',
               )}
             >
               <Pin className="h-3.5 w-3.5" />

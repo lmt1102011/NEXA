@@ -3,6 +3,12 @@ let suppressClick = false
 let pendingTimer: number | null = null
 let enabled = false
 
+function isEditable(target: unknown): target is HTMLElement {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
+}
+
 function clearPending() {
   if (pendingTimer !== null) {
     window.clearTimeout(pendingTimer)
@@ -60,6 +66,11 @@ export function enableTapCompat() {
         pendingTimer = null
         if (suppressClick || !tap.target) return
         if (tap.target instanceof HTMLElement || tap.target instanceof SVGElement) {
+          // Untrusted, synthetic clicks do not run the browser's default focus
+          // action, so on engines that do not synthesize a native click after a
+          // finger tap, inputs would never focus. Mirror the native behavior:
+          // focus editable targets before re-dispatching the click.
+          if (isEditable(tap.target) && document.activeElement !== tap.target) tap.target.focus()
           tap.target.dispatchEvent(
             new MouseEvent('click', { bubbles: true, cancelable: true, composed: true, view: window }),
           )

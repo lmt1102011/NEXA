@@ -112,6 +112,13 @@ function getStatusConfig(status: string, detail: string, t: (key: string, vars?:
         home: true,
         retry: t('Try again'),
       }
+    case 'kicked':
+      return {
+        icon: <UserX className="h-6 w-6" />,
+        title: t('You were removed'),
+        description: t('The host removed you from this room, so you left the call.'),
+        home: true,
+      }
     case 'ended':
       return {
         icon: <PhoneOff className="h-6 w-6" />,

@@ -18,7 +18,7 @@ import { mediaEngine } from '@/services/media/MediaEngine'
 import { qualityController } from '@/services/media/QualityController'
 import { announceRoomDeletion } from '@/services/directory/PublicRoomsDirectory'
 import { buildFileMessage, buildSystemMessage, buildTextMessage } from '@/lib/chat'
-import { generateId } from '@/lib/utils'
+import { generateId, createHostToken } from '@/lib/utils'
 import { t } from '@/lib/i18n'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore, buildSelfParticipant } from '@/stores/roomSession'
@@ -82,6 +82,19 @@ function notify(input: ToastInput) {
 
 function store() {
   return useRoomSessionStore.getState()
+}
+
+/**
+ * A device is an "authenticated host" when its own role says host AND it holds
+ * the room's host token. The token is minted on the creating device and moved
+ * peer-to-peer on host transfer, so a visitor who forges their `userId` to look
+ * like the room's host id still gets no host powers — they have no token.
+ */
+function isAuthenticatedHost(): boolean {
+  if (!activeRoomId) return false
+  const state = store()
+  if (!state.self || state.self.role !== 'host') return false
+  return useSessionStore.getState().hostTokens[activeRoomId] !== undefined
 }
 
 export function initRoom(roomId: ID): () => void {
@@ -536,7 +549,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       state.toggleReaction(event.messageId, event.emoji, event.userId)
       break
     case 'request': {
-      if (state.self?.role !== 'host') return
+      if (!isAuthenticatedHost()) return
       const rosterClash = nameTakenBy(event.request.name, event.request.participantId)
       const requestClash =
         store()
@@ -576,7 +589,14 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'kick': {
       if (event.participantId === selfId) {
-        state.setStatus('rejected', 'The host removed you from this room.')
+        // Being removed is not a clean leave: the target device must drop its
+        // own connection too, otherwise it keeps heartbeating and the host
+        // re-adds it to the roster (the "kicked user is still in the room" bug).
+        if (activeRoomId) decParticipantCount(activeRoomId)
+        activeRoomId = null
+        if (state.self) realtime?.emit({ type: 'peer-leave', participantId: state.self.id })
+        stopLocalMedia()
+        state.setStatus('kicked')
         return
       }
       state.removeParticipant(event.participantId)
@@ -596,13 +616,22 @@ function handleRealtimeEvent(event: RoomEvent) {
       })
       break
     }
-    case 'end':
+    case 'end': {
+      // A room can only be ended by the device holding the host role. When the
+      // sender's identity is known, reject end-commands from anyone else.
+      if (event.senderId !== undefined && state.room && event.senderId !== state.room.hostId) break
       stopLocalMedia()
       state.setStatus('ended')
       if (activeRoomId) {
         useRoomsStore.getState().removeRoom(activeRoomId)
       }
       break
+    }
+    case 'host-transfer': {
+      if (event.to !== selfId || !activeRoomId) break
+      useSessionStore.getState().setHostToken(activeRoomId, event.token)
+      break
+    }
   }
 }
 
@@ -638,7 +667,8 @@ export async function requestJoin(options: JoinOptions) {
   const self = buildSelfParticipant({
     id: session.userId,
     name: options.name,
-    role: room.hostId === session.userId ? 'host' : 'guest',
+    role:
+      room.hostId === session.userId && session.hostTokens[room.id] !== undefined ? 'host' : 'guest',
     avatarColor: session.avatarColor,
   })
   self.micOn = call.micOn
@@ -1091,7 +1121,7 @@ export async function toggleScreenShare() {
     notify({ title: t('Screen sharing is disabled by the host'), variant: 'warning' })
     return
   }
-  if (self.role !== 'host' && !self.permissions?.canShareScreen && !room.settings.screenShare.allowParticipants) {
+  if (!isAuthenticatedHost() && !self.permissions?.canShareScreen && !room.settings.screenShare.allowParticipants) {
     notify({ title: t('Only the host can share their screen'), variant: 'warning' })
     return
   }
@@ -1105,7 +1135,15 @@ export async function toggleScreenShare() {
   }
 
   const started = await mediaEngine.startScreenShare()
-  if (!started) return
+  if (!started) {
+    notify({
+      title: t('Screen sharing is not supported on this device'),
+      description: t('This browser cannot capture your screen. You can still share your camera.'),
+      variant: 'warning',
+      duration: 5000,
+    })
+    return
+  }
   call.setSharing(true)
   syncSelf()
   pushOutgoingStream()
@@ -1157,7 +1195,7 @@ export function applyLocalAudioPreferences(prefs: { noiseFilter: NoiseFilter; ec
 export function applyHostSettings(patch: RoomSettingsPatch) {
   const state = store()
   const self = state.self
-  if (!self || (self.role !== 'host' && !self.permissions?.canManageRoom)) return
+  if (!self || (!isAuthenticatedHost() && !self.permissions?.canManageRoom)) return
   state.applySettingsPatch(patch)
   realtime?.emit({ type: 'settings', patch })
 }
@@ -1169,18 +1207,19 @@ export function applyHostSettings(patch: RoomSettingsPatch) {
  */
 export function grantParticipantPermissions(participantId: ID, permissions: ParticipantPermissions) {
   const state = store()
-  if (state.self?.role !== 'host') return
+  const self = state.self
+  if (!isAuthenticatedHost() || !self) return
   const target = state.participants.find((participant) => participant.id === participantId)
-  if (!target || target.id === state.self.id || target.role === 'host') return
+  if (!target || target.id === self.id || target.role === 'host') return
   state.updateParticipant(participantId, { permissions })
   realtime?.emit({ type: 'peer-update', participantId, patch: { permissions } })
 }
 
-/** Host rights: the host always, or a participant granted `canModerate`. */
+/** Host rights: the device must be an authenticated host, or be a granted moderator. */
 function canModerate(): boolean {
   const self = store().self
   if (!self) return false
-  return self.role === 'host' || Boolean(self.permissions?.canModerate)
+  return Boolean(self.permissions?.canModerate) || isAuthenticatedHost()
 }
 
 export function hostMuteParticipant(participantId: ID) {
@@ -1217,9 +1256,17 @@ export function hostRemoveParticipant(participantId: ID) {
 export function hostTransferHost(participantId: ID) {
   const state = store()
   const self = state.self
-  if (!self || self.role !== 'host') return
+  const roomId = activeRoomId
+  if (!self || !isAuthenticatedHost() || !roomId) return
   const target = state.participants.find((participant) => participant.id === participantId)
   if (!target || target.id === self.id) return
+
+  // Hand the host token to the new host over their peer connection ONLY, then
+  // revoke ours. Broadcast role patches promote the new host for everyone, but
+  // authority stays with whichever device holds the token.
+  const token = createHostToken()
+  realtime?.sendTarget({ type: 'host-transfer', token, to: target.id }, target.id)
+  useSessionStore.getState().clearHostToken(roomId)
 
   state.updateParticipant(self.id, { role: 'guest' })
   state.updateParticipant(target.id, { role: 'host' })
@@ -1237,13 +1284,17 @@ export function hostTransferHost(participantId: ID) {
 export function hostLeaveWithDelegate(participantId: ID, note?: string) {
   const state = store()
   const self = state.self
-  if (!self || self.role !== 'host') return
+  const roomId = activeRoomId
+  if (!self || !isAuthenticatedHost() || !roomId) return
   const target = state.participants.find((participant) => participant.id === participantId)
   if (target && target.id !== self.id) {
+    const token = createHostToken()
+    realtime?.sendTarget({ type: 'host-transfer', token, to: target.id }, target.id)
     state.updateParticipant(target.id, { role: 'host' })
     realtime?.emit({ type: 'peer-update', participantId: target.id, patch: { role: 'host' } })
     state.addMessage(buildSystemMessage(state.room?.id ?? '', t('{name} is now the host of this room', { name: target.name })))
   }
+  useSessionStore.getState().clearHostToken(roomId)
   if (note && note.trim()) {
     state.addMessage(buildSystemMessage(state.room?.id ?? '', note.trim()))
   }
@@ -1252,7 +1303,7 @@ export function hostLeaveWithDelegate(participantId: ID, note?: string) {
 
 export function hostEndRoom() {
   const state = store()
-  if (state.self?.role !== 'host') return
+  if (!isAuthenticatedHost()) return
   realtime?.emit({ type: 'end' })
   stopLocalMedia()
   state.setStatus('ended')
@@ -1266,7 +1317,7 @@ export function hostEndRoom() {
 export function hostToggleLock(locked: boolean) {
   const state = store()
   const self = state.self
-  if (!self || (self.role !== 'host' && !self.permissions?.canManageRoom)) return
+  if (!self || (!isAuthenticatedHost() && !self.permissions?.canManageRoom)) return
   applyHostSettings({ access: { lockRoom: locked } })
   if (state.room) {
     state.addMessage(buildSystemMessage(state.room.id, locked ? t('Room was locked') : t('Room was unlocked')))

@@ -237,7 +237,7 @@ export function ControlBar() {
   }
 
   if (isMobile) {
-    const mobileKeys = ['mic', 'camera', 'chat']
+    const mobileKeys = ['mic', 'camera', 'share', 'chat']
     const mobileItems = items.filter((item) => mobileKeys.includes(item.key))
     return (
       <div className="relative z-20 flex shrink-0 items-center gap-1 border-t border-line bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur">

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -18,7 +18,7 @@ import { useRoomSessionStore } from '@/stores/roomSession'
 import { hostDisableCamera, hostMuteParticipant, hostRemoveParticipant } from '@/features/room/session/sessionController'
 import type { Participant } from '@/types'
 
-export function VideoTile({
+export const VideoTile = memo(function VideoTile({
   participant,
   compact = false,
   className,
@@ -201,4 +201,4 @@ export function VideoTile({
       ) : null}
     </motion.div>
   )
-}
+})

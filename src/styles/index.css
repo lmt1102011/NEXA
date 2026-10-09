@@ -295,6 +295,7 @@ html.light[data-accent='amber'] {
 
   body {
     margin: 0;
+    overflow-x: clip;
     min-height: 100dvh;
     background-color: var(--nx-bg);
     color: var(--nx-ink);

@@ -22,7 +22,8 @@ export type RoomEvent =
   | { type: 'settings'; patch: RoomSettingsPatch }
   | { type: 'kick'; participantId: ID }
   | { type: 'name-taken'; participantId: ID; name: string }
-  | { type: 'end' }
+  | { type: 'host-transfer'; token: string; to: ID }
+  | { type: 'end'; senderId?: ID }
 
 export type RoomEventListener = (event: RoomEvent) => void
 export type RemoteStreamListener = (stream: MediaStream | null, peerId: string) => void
@@ -49,6 +50,8 @@ export interface RealtimeService {
   disconnect: () => void
   forcePeerLeave: (participantId: ID) => void
   emit: (event: RoomEvent) => void
+  /** Sends an event to a single participant's peer connection (never broadcast). */
+  sendTarget: (event: RoomEvent, participantId: ID) => void
   on: (listener: RoomEventListener) => () => void
   onRemoteStream: (listener: RemoteStreamListener) => () => void
   dispose: () => void

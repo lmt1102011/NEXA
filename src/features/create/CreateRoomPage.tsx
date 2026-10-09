@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider'
 import { ToggleRow } from '@/components/ui/switch'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
+import { createHostToken } from '@/lib/utils'
 import { useRoomsStore } from '@/stores/rooms'
 import { useSessionStore } from '@/stores/session'
 import { toast } from '@/stores/ui'
@@ -51,6 +52,7 @@ export default function CreateRoomPage() {
         defaultCamera,
         allowChat,
       })
+      useSessionStore.getState().setHostToken(room.id, createHostToken())
       toast({
         title: t('Room created'),
         description: visibility === 'public' ? t('Your room is live and listed publicly.') : t('Your room is private — share the link or code.'),

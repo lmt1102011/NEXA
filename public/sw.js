@@ -5,17 +5,20 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting()),
+      .then((cache) => cache.addAll(PRECACHE)),
   )
 })
 
+// Do NOT skipWaiting()/clients.claim(): taking control mid-session forces a
+// full reload right as the user is interacting (tapping an input, joining
+// a room), which drops focus and makes the app feel broken on mobile.
+// New builds simply activate on the next visit — the app's `controllerchange`
+// listener already reloads once when that happens.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))),
   )
 })
 

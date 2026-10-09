@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MonitorUp, UserPlus, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -12,12 +12,37 @@ import { useUiStore } from '@/stores/ui'
 import { acceptRequest, rejectRequest } from '@/features/room/session/sessionController'
 import { VideoGrid } from '@/features/room/VideoGrid'
 import { VideoTile } from '@/features/room/VideoTile'
+import { ActivityDock } from '@/features/room/activities/ActivityDock'
 import type { Participant } from '@/types'
 
 export default function RoomStage() {
   const participants = useRoomSessionStore((state) => state.participants)
   const sharing = useCallStore((state) => state.sharing)
+  const remoteStreams = useCallStore((state) => state.remoteStreams)
   const background = useRoomSessionStore((state) => state.room?.settings.appearance.background ?? 'default')
+
+  const presenter = useMemo(() => {
+    const activeRemote = participants.find(
+      (participant) =>
+        !participant.isSelf &&
+        participant.screenSharing &&
+        participant.peerId &&
+        remoteStreams[participant.peerId]?.getVideoTracks().some((track) => track.readyState === 'live'),
+    )
+    if (sharing) {
+      const self = participants.find((participant) => participant.isSelf)
+      return { stream: () => mediaEngine.getScreenStream(), name: self?.name ?? '', selfPresenting: true }
+    }
+    if (activeRemote) {
+      const stream = remoteStreams[activeRemote.peerId as string]
+      return {
+        stream: () => stream,
+        name: activeRemote.name,
+        selfPresenting: false,
+      }
+    }
+    return null
+  }, [participants, sharing, remoteStreams])
 
   const stageStyle: React.CSSProperties | undefined =
     background === 'aurora'
@@ -36,26 +61,33 @@ export default function RoomStage() {
       )}
       style={stageStyle}
     >
-      {sharing ? <SharingLayout participants={participants} /> : <VideoGrid participants={participants} />}
+      {presenter ? <SharingLayout presenter={presenter} participants={participants} /> : <VideoGrid participants={participants} />}
+      <ActivityDock />
       <JoinRequestBanner />
     </div>
   )
 }
 
-function SharingLayout({ participants }: { participants: Participant[] }) {
+interface Presenter {
+  stream: () => MediaStream | null
+  name: string
+  selfPresenting: boolean
+}
+
+function SharingLayout({ presenter, participants }: { presenter: Presenter; participants: Participant[] }) {
   const others = participants.filter((participant) => !participant.isSelf)
   const self = participants.find((participant) => participant.isSelf)
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-2 sm:gap-3 sm:p-3">
       <div className="relative min-h-0 flex-1">
-        <ScreenTile />
+        <ScreenTile presenter={presenter} />
       </div>
-      <div className="flex h-[96px] shrink-0 gap-2 sm:h-[120px] sm:gap-3">
+      <div className="flex h-[84px] shrink-0 gap-2 sm:h-[120px] sm:gap-3">
         {[self, ...others]
           .filter((participant): participant is Participant => Boolean(participant))
           .map((participant) => (
-            <div key={participant.id} className="h-full w-[150px] shrink-0 sm:w-[180px]">
+            <div key={participant.id} className="h-full w-[128px] shrink-0 sm:w-[180px]">
               <VideoTile participant={participant} compact className="h-full" />
             </div>
           ))}
@@ -64,18 +96,17 @@ function SharingLayout({ participants }: { participants: Participant[] }) {
   )
 }
 
-function ScreenTile() {
+function ScreenTile({ presenter }: { presenter: Presenter }) {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const sharing = useCallStore((state) => state.sharing)
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    const stream = mediaEngine.getScreenStream()
+    const stream = presenter.stream()
     video.srcObject = stream
     if (stream) void video.play().catch(() => undefined)
-  }, [sharing])
+  }, [presenter])
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl border border-line bg-[#07080d] sm:rounded-2xl">
@@ -83,7 +114,9 @@ function ScreenTile() {
 
       <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1 text-[11.5px] font-medium text-white backdrop-blur">
         <MonitorUp className="h-3.5 w-3.5" />
-        {t('You are presenting')}
+        {presenter.selfPresenting
+          ? t('You are presenting')
+          : t('{name} is presenting', { name: presenter.name })}
       </span>
     </div>
   )

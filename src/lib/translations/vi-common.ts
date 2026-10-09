@@ -63,4 +63,48 @@ export const commonVi: Record<string, TranslationEntry> = {
   '{name} is now the host of this room': '{name} giờ là chủ phòng của phòng này',
   'Room was locked': 'Phòng đã được khóa',
   'Room was unlocked': 'Phòng đã được mở khóa',
+
+  // ---- connection quality ----
+  'Unstable connection': 'Kết nối không ổn định',
+  'NEXA is lowering video quality to keep the call stable.': 'NEXA đang giảm chất lượng video để cuộc gọi mượt hơn.',
+  'Connection restored': 'Đã khôi phục kết nối',
+  'Video quality is back to normal.': 'Chất lượng video đã trở lại bình thường.',
+
+  // ---- kicked ----
+  'You were removed': 'Bạn đã bị xóa khỏi phòng',
+  'The host removed you from this room, so you left the call.': 'Chủ phòng đã xóa bạn khỏi phòng, nên bạn đã thoát khỏi cuộc gọi.',
+
+  // ---- screen share ----
+  'Screen sharing is not supported on this device': 'Thiết bị này không hỗ trợ chia sẻ màn hình',
+  'This browser cannot capture your screen. You can still share your camera.': 'Trình duyệt này không thể thu màn hình của bạn. Bạn vẫn có thể mở camera.',
+  '{name} is presenting': '{name} đang trình chiếu',
+
+  // ---- video grid ----
+  'Show all participants ({count})': 'Hiện tất cả {count} người tham dự',
+  'More': 'Thêm',
+  '{count} people in the room': '{count} người trong phòng',
+  'Close': 'Đóng',
+  'Sharing screen': 'Đang chia sẻ màn hình',
+
+  // ---- activity dock / drawer ----
+  'Activities': 'Hoạt động',
+  'Activities · {count}': 'Hoạt động · {count}',
+  'Collapse activities': 'Thu gọn hoạt động',
+  'Add an activity': 'Thêm một hoạt động',
+  'Poll': 'Bình chọn',
+  'Task': 'Công việc',
+  'To-do': 'Việc cần làm',
+  'Activities are shared live with everyone in the room.': 'Hoạt động được chia sẻ trực tiếp cho mọi người trong phòng.',
+  '{count} tasks': '{count} công việc',
+  '{count} to-dos': '{count} việc cần làm',
+  'Add': 'Thêm',
+  'Poll ended': 'Đã kết thúc bình chọn',
+  'Vote {option}': 'Bình chọn {option}',
+  'Results': 'Kết quả',
+
+  // ---- chat: copy / pin ----
+  'Copy': 'Sao chép',
+  'Copied': 'Đã sao chép',
+  'Pin': 'Ghim',
+  'Unpin': 'Bỏ ghim',
 }

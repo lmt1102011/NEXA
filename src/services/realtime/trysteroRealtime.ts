@@ -26,6 +26,7 @@ const EVENT_TYPES = [
   'settings',
   'kick',
   'name-taken',
+  'host-transfer',
   'end',
 ] as const
 
@@ -37,6 +38,13 @@ interface StatsBucket {
   rxLost: number
   txBytes: number
 }
+
+/**
+ * Events that change room-wide state. Recipients attach the best-known sender
+ * participant id to these so the session can refuse actions that did not come
+ * from the room's host (or a granted moderator).
+ */
+const SENDER_VERIFIED_EVENTS: ReadonlySet<string> = new Set(['settings', 'kick', 'end', 'host-transfer'])
 
 /**
  * Serverless WebRTC transport built on Trystero. Peers discover each other
@@ -267,6 +275,19 @@ export class TrysteroRealtimeService implements RealtimeService {
     this.send(event.type, event)
   }
 
+  /**
+   * Delivers an event over the direct peer connection to one participant only.
+   * Used for secrets like the host token: even if a relay is malicious, the
+   * payload never reaches other peers.
+   */
+  sendTarget(event: RoomEvent, participantId: ID) {
+    if (!event.type) return
+    const peerId = this.peerByParticipant.get(participantId)
+    if (!peerId) return
+    const action = this.actions.get(event.type)
+    void action?.send(event as unknown as DataPayload, { target: peerId }).catch(() => undefined)
+  }
+
   on(listener: RoomEventListener) {
     this.listeners.add(listener)
     return () => {
@@ -323,7 +344,7 @@ export class TrysteroRealtimeService implements RealtimeService {
       case 'peer-update':
       case 'peer-leave':
       default:
-        this.dispatch(event)
+        this.dispatch(event, this.participantByPeer.get(peerId))
     }
   }
 
@@ -353,7 +374,10 @@ export class TrysteroRealtimeService implements RealtimeService {
     for (const listener of this.streamListeners) listener(stream, peerId)
   }
 
-  private dispatch(event: RoomEvent) {
+  private dispatch(event: RoomEvent, senderParticipantId?: ID) {
+    if (senderParticipantId && SENDER_VERIFIED_EVENTS.has(event.type)) {
+      event = { ...event, senderId: senderParticipantId } as RoomEvent
+    }
     for (const listener of this.listeners) listener(event)
   }
 }
