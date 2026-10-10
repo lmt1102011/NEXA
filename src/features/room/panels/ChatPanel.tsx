@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Check, ClipboardCopy, Download, FileText, Paperclip, Pin, SendHorizontal, SmilePlus, X } from 'lucide-react'
+import { Check, ClipboardCopy, Download, FileText, Paperclip, Pin, Reply, Search, SendHorizontal, SmilePlus, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { useCopy } from '@/hooks'
@@ -13,6 +13,7 @@ import {
   pinMessage,
   sendChatMessage,
   sendFileMessage,
+  sendTyping,
   toggleReaction,
 } from '@/features/room/session/sessionController'
 import type { ChatMessage } from '@/types'
@@ -36,19 +37,48 @@ export function ChatPanel() {
   const markRead = useRoomSessionStore((state) => state.markRead)
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
+  const typing = useRoomSessionStore((state) => state.typing)
   const t = useT()
 
   const [draft, setDraft] = useState('')
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
+  const [search, setSearch] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const scrollPinned = useRef(true)
+  const typingTimer = useRef<number | null>(null)
 
   const chatEnabled = room?.settings.chat.enabled ?? true
   const allowFiles = room?.settings.chat.allowFiles ?? true
 
+  const typingNames = Object.values(typing).map((entry) => entry.name)
+  const visibleMessages = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return messages
+    return messages.filter(
+      (message) =>
+        message.text.toLowerCase().includes(query) ||
+        message.senderName.toLowerCase().includes(query),
+    )
+  }, [messages, search])
+
   useEffect(() => {
     markRead()
   }, [markRead])
+
+  useEffect(() => {
+    return () => {
+      if (typingTimer.current !== null) window.clearTimeout(typingTimer.current)
+      sendTyping(false)
+    }
+  }, [])
+
+  function handleDraftChange(value: string) {
+    setDraft(value)
+    sendTyping(value.trim().length > 0)
+    if (typingTimer.current !== null) window.clearTimeout(typingTimer.current)
+    typingTimer.current = window.setTimeout(() => sendTyping(false), 2500)
+  }
 
   useEffect(() => {
     const list = listRef.current
@@ -64,10 +94,12 @@ export function ChatPanel() {
   }
 
   function submit() {
-    const text = draft.trim()
-    if (!text) return
-    sendChatMessage(text)
+    const trimmed = draft.trim()
+    if (!trimmed) return
+    sendChatMessage(trimmed, replyTo ?? undefined)
     setDraft('')
+    setReplyTo(null)
+    sendTyping(false)
     scrollPinned.current = true
   }
 
@@ -109,24 +141,91 @@ export function ChatPanel() {
         </div>
       ) : null}
 
+      <div className="shrink-0 border-b border-line px-3 py-2">
+        <div className="flex items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2">
+          <Search className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t('Search messages…')}
+            aria-label={t('Search messages')}
+            className="h-7 w-full bg-transparent text-[12.5px] text-ink placeholder:text-ink-subtle focus:outline-none"
+          />
+          {search ? (
+            <button
+              type="button"
+              aria-label={t('Clear search')}
+              onClick={() => setSearch('')}
+              className="grid h-5 w-5 shrink-0 place-items-center rounded text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       <div ref={listRef} onScroll={handleScroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto nx-scroll px-3 py-3.5">
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <EmptyState
             icon={<SendHorizontal className="h-5 w-5" />}
-            title={t('No messages yet')}
-            description={t('Say hi — messages are visible to everyone in the room.')}
+            title={search ? t('No messages match') : t('No messages yet')}
+            description={
+              search
+                ? t('Try a different search term.')
+                : t('Say hi — messages are visible to everyone in the room.')
+            }
             className="py-10"
           />
         ) : (
-          messages.map((message) => <ChatRow key={message.id} message={message} />)
+          visibleMessages.map((message) => <ChatRow key={message.id} message={message} onReply={setReplyTo} />)
         )}
       </div>
+
+      {typingNames.length > 0 ? (
+        <div className="flex shrink-0 items-center gap-1.5 px-3 py-1 text-[11.5px] text-ink-subtle">
+          <span className="flex items-end gap-[2px]" aria-hidden>
+            {[0, 1, 2].map((index) => (
+              <motion.span
+                key={index}
+                className="h-1 w-1 rounded-full bg-ink-subtle"
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1, repeat: Infinity, delay: index * 0.2 }}
+              />
+            ))}
+          </span>
+          {typingNames.length === 1
+            ? t('{name} is typing…', { name: typingNames[0] })
+            : t('{count} people are typing…', { count: typingNames.length })}
+        </div>
+      ) : null}
 
       {unread > 0 ? (
         <div className="relative">
           <div className="absolute -top-9 left-1/2 -translate-x-1/2 rounded-full bg-accent-solid px-3 py-1 text-[11.5px] font-medium text-white shadow-md">
             {t('{count} new messages', { count: unread })}
           </div>
+        </div>
+      ) : null}
+
+      {replyTo ? (
+        <div className="flex shrink-0 items-center gap-2 border-t border-line bg-surface-2 px-3 py-1.5">
+          <Reply className="h-3.5 w-3.5 shrink-0 text-accent" />
+          <p className="min-w-0 flex-1 truncate text-[12px]">
+            <span className="font-medium text-ink-muted">
+              {t('Replying to {name}', { name: replyTo.senderId === self?.id ? t('yourself') : replyTo.senderName })}
+            </span>{' '}
+            <span className="text-ink-subtle">
+              {replyTo.kind === 'file' && replyTo.file ? replyTo.file.name : replyTo.text}
+            </span>
+          </p>
+          <button
+            type="button"
+            aria-label={t('Cancel reply')}
+            onClick={() => setReplyTo(null)}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       ) : null}
 
@@ -157,7 +256,7 @@ export function ChatPanel() {
 
           <textarea
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => handleDraftChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
@@ -185,7 +284,7 @@ export function ChatPanel() {
   )
 }
 
-function ChatRow({ message }: { message: ChatMessage }) {
+function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (message: ChatMessage) => void }) {
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
   const settings = useRoomSessionStore((state) => state.room?.settings)
@@ -256,6 +355,12 @@ function ChatRow({ message }: { message: ChatMessage }) {
             own ? 'rounded-tr-sm bg-accent-soft text-ink' : 'rounded-tl-sm border border-line bg-surface-2 text-ink',
           )}
         >
+          {message.replyTo ? (
+            <div className="mb-1.5 rounded-lg border-l-2 border-accent/60 bg-black/10 px-2 py-1">
+              <p className="text-[11px] font-medium text-accent">{message.replyTo.name}</p>
+              <p className="truncate text-[12px] text-ink-muted">{message.replyTo.text}</p>
+            </div>
+          ) : null}
           {message.kind === 'file' && message.file ? (
             <a
               href={message.file.url}
@@ -295,6 +400,19 @@ function ChatRow({ message }: { message: ChatMessage }) {
               {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
               {copied ? t('Copied') : t('Copy')}
             </button>
+            {onReply ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onReply(message)
+                  setActionsOpen(false)
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-ink transition-colors hover:bg-surface-3"
+              >
+                <Reply className="h-3.5 w-3.5" />
+                {t('Reply')}
+              </button>
+            ) : null}
             {canPin ? (
               <button
                 type="button"

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff, VolumeX, Volume1, Volume2 } from 'lucide-react'
+import { Crown, Mic, MicOff, MoreVertical, Pin, PinOff, Trash, VideoOff, VolumeX, Volume1, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { Avatar } from '@/components/ui/avatar'
@@ -17,6 +17,7 @@ import { Slider } from '@/components/ui/slider'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
+import { useUiStore } from '@/stores/ui'
 import { useVolumesStore } from '@/stores/volumes'
 import { hostDisableCamera, hostMuteParticipant, hostRemoveParticipant } from '@/features/room/session/sessionController'
 import type { Participant } from '@/types'
@@ -44,6 +45,9 @@ export const VideoTile = memo(function VideoTile({
   )
   const volume = useVolumesStore((state) => state.volumes[participant.id] ?? 100)
   const setVolume = useVolumesStore((state) => state.setVolume)
+  const activeOutputId = useCallStore((state) => state.activeOutputId)
+  const pinned = useUiStore((state) => state.spotlightId === participant.id)
+  const setSpotlight = useUiStore((state) => state.setSpotlight)
 
   const showLocalVideo = isSelf && participant.cameraOn && hasLocalVideo
   const remoteHasLiveVideo = Boolean(
@@ -76,8 +80,12 @@ export const VideoTile = memo(function VideoTile({
       audio.srcObject = remoteStream
       audio.volume = Math.min(1, volume / 100)
       void audio.play().catch(() => undefined)
+      const sinkable = audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }
+      if (typeof sinkable.setSinkId === 'function') {
+        void sinkable.setSinkId(activeOutputId || 'default').catch(() => undefined)
+      }
     }
-  }, [remoteStream, showRemoteVideo, volume])
+  }, [remoteStream, showRemoteVideo, volume, activeOutputId])
 
   const hasLiveMedia = showLocalVideo || showRemoteVideo
 
@@ -89,9 +97,11 @@ export const VideoTile = memo(function VideoTile({
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         'group relative min-h-0 overflow-hidden rounded-xl border bg-surface-2 transition-shadow duration-200 sm:rounded-2xl',
-        participant.isSpeaking
-          ? 'border-success/70 shadow-[0_0_0_1.5px_rgba(61,220,151,0.65),0_0_32px_-10px_rgba(61,220,151,0.5)]'
-          : 'border-line',
+        pinned
+          ? 'border-accent/70 shadow-[0_0_0_1.5px_rgba(124,116,255,0.6),0_0_32px_-12px_rgba(124,116,255,0.5)]'
+          : participant.isSpeaking
+            ? 'border-success/70 shadow-[0_0_0_1.5px_rgba(61,220,151,0.65),0_0_32px_-10px_rgba(61,220,151,0.5)]'
+            : 'border-line',
         className,
       )}
       style={
@@ -132,6 +142,26 @@ export const VideoTile = memo(function VideoTile({
       {!isSelf && remoteStream ? (
         <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
       ) : null}
+
+      <button
+        type="button"
+        aria-label={pinned ? t('Unpin {name}', { name: participant.name }) : t('Pin {name}', { name: participant.name })}
+        aria-pressed={pinned}
+        onClick={() => setSpotlight(pinned ? null : participant.id)}
+        className={cn(
+          'absolute left-2 top-2 z-10 grid place-items-center rounded-lg backdrop-blur-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+          compact ? 'h-6 w-6' : 'h-7 w-7',
+          pinned
+            ? 'bg-accent-solid text-white'
+            : 'bg-black/45 text-white/80 opacity-80 hover:bg-black/65 hover:text-white hover:opacity-100',
+        )}
+      >
+        {pinned ? (
+          <PinOff className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        ) : (
+          <Pin className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        )}
+      </button>
 
       {!isSelf && remoteStream ? (
         <Popover>

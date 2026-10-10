@@ -12,11 +12,13 @@ interface UiState {
   panel: RoomPanel | null
   modal: RoomModal | null
   shortcutsOpen: boolean
+  spotlightId: string | null
   pushToast: (toast: ToastInput) => string
   dismissToast: (id: string) => void
   setPanel: (panel: RoomPanel | null) => void
   setModal: (modal: RoomModal | null) => void
   setShortcutsOpen: (open: boolean) => void
+  setSpotlight: (participantId: string | null) => void
 }
 
 export const useUiStore = create<UiState>()((set, get) => ({
@@ -24,6 +26,7 @@ export const useUiStore = create<UiState>()((set, get) => ({
   panel: null,
   modal: null,
   shortcutsOpen: false,
+  spotlightId: null,
 
   pushToast: (toast) => {
     const id = generateId('toast')
@@ -44,6 +47,8 @@ export const useUiStore = create<UiState>()((set, get) => ({
   setModal: (modal) => set({ modal }),
 
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+
+  setSpotlight: (participantId) => set({ spotlightId: participantId }),
 }))
 
 export function toast(input: ToastInput) {

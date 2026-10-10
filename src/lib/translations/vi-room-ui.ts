@@ -16,6 +16,17 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   'Pin message': 'Ghim tin nhắn',
   'Unpin message': 'Bỏ ghim tin nhắn',
   'Add reaction': 'Thêm phản ứng',
+  'Search messages…': 'Tìm tin nhắn…',
+  'Search messages': 'Tìm tin nhắn',
+  'Clear search': 'Xóa tìm kiếm',
+  'No messages match': 'Không có tin nhắn khớp',
+  'Try a different search term.': 'Thử từ khóa khác.',
+  '{name} is typing…': '{name} đang nhập…',
+  '{count} people are typing…': '{count} người đang nhập…',
+  Reply: 'Trả lời',
+  'Replying to {name}': 'Đang trả lời {name}',
+  yourself: 'chính bạn',
+  'Cancel reply': 'Hủy trả lời',
   You: 'Bạn',
 
   // ── Participants panel ────────────────────────────────────────
@@ -47,6 +58,8 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   'Can mute & remove': 'Được tắt mic & xóa người',
   'Can manage room': 'Được quản lý phòng',
   'Remove from room': 'Xóa khỏi phòng',
+  '1 hand raised': '1 người giơ tay',
+  '{count} hands raised': '{count} người giơ tay',
 
   // ── Activities panel: sections & tools ────────────────────────
   People: 'Mọi người',
@@ -157,6 +170,9 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   // ── Hand raise & floating reactions ───────────────────────────
   'Raise hand': 'Giơ tay',
   'Lower hand': 'Hạ tay',
+  'Pin {name}': 'Ghim {name}',
+  'Unpin {name}': 'Bỏ ghim {name}',
+  'Exit spotlight': 'Thoát chế độ nổi bật',
   'Hand raised': 'Đã giơ tay',
   '{name} raised their hand': '{name} đã giơ tay',
   'React': 'Thả cảm xúc',

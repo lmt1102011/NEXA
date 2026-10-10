@@ -20,6 +20,7 @@ export type RoomEvent =
   | { type: 'reaction'; messageId: ID; emoji: string; userId: ID; senderId?: ID }
   | { type: 'hand'; participantId: ID; raised: boolean; senderId?: ID }
   | { type: 'float'; emoji: string; participantId: ID; name: string; senderId?: ID }
+  | { type: 'typing'; participantId: ID; name: string; typing: boolean; senderId?: ID }
   | { type: 'request'; request: JoinRequest }
   | {
       type: 'snapshot'

@@ -103,6 +103,9 @@ let remotePeerSeen = false
 let droppedPeersBySilence = false
 let reconnectAttempts = 0
 let hardReconnects = 0
+let lastTypingSent = 0
+let typingActive = false
+const typingTimers = new Map<ID, number>()
 
 function notify(input: ToastInput) {
   toast(input)
@@ -914,10 +917,33 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'hand': {
       if (!event.senderId || event.participantId !== event.senderId) break
-      state.updateParticipant(event.participantId, { handRaised: Boolean(event.raised) })
+      state.updateParticipant(event.participantId, {
+        handRaised: Boolean(event.raised),
+        handRaisedAt: event.raised ? Date.now() : undefined,
+      })
       const raiser = store().participants.find((participant) => participant.id === event.participantId)
       if (event.raised && raiser && !raiser.isSelf) {
         notify({ title: t('{name} raised their hand', { name: raiser.name }), variant: 'info', duration: 4000 })
+      }
+      break
+    }
+    case 'typing': {
+      if (!event.senderId || event.participantId !== event.senderId || event.participantId === selfId) break
+      const name = typeof event.name === 'string' ? event.name.slice(0, 40) : ''
+      const pending = typingTimers.get(event.participantId)
+      if (pending !== undefined) {
+        window.clearTimeout(pending)
+        typingTimers.delete(event.participantId)
+      }
+      state.setTyping(event.participantId, name, Boolean(event.typing))
+      if (event.typing) {
+        typingTimers.set(
+          event.participantId,
+          window.setTimeout(() => {
+            typingTimers.delete(event.participantId)
+            store().setTyping(event.participantId, name, false)
+          }, 5000),
+        )
       }
       break
     }
@@ -1164,7 +1190,7 @@ export function leaveRoom() {
   fullTeardown()
 }
 
-export function sendChatMessage(text: string) {
+export function sendChatMessage(text: string, replyTo?: ChatMessage) {
   const state = store()
   if (!state.room || !state.self) return
   if (!state.room.settings.chat.enabled) {
@@ -1178,8 +1204,35 @@ export function sendChatMessage(text: string) {
     avatarColor: state.self.avatarColor,
     text,
   })
+  if (replyTo) {
+    message.replyTo = {
+      id: replyTo.id,
+      name: replyTo.senderName,
+      text: replyTo.kind === 'file' && replyTo.file ? replyTo.file.name : replyTo.text,
+    }
+  }
   state.addMessage(message)
   realtime?.emit({ type: 'chat', message })
+  sendTyping(false)
+}
+
+/**
+ * Broadcasts a lightweight "is typing" signal. Outgoing true signals are
+ * throttled; a single false is sent when the user stops or sends.
+ */
+export function sendTyping(active: boolean) {
+  const self = store().self
+  if (!realtime || !self) return
+  if (active) {
+    const now = Date.now()
+    if (now - lastTypingSent < 1500) return
+    lastTypingSent = now
+    typingActive = true
+    realtime.emit({ type: 'typing', participantId: self.id, name: self.name, typing: true })
+  } else if (typingActive) {
+    typingActive = false
+    realtime.emit({ type: 'typing', participantId: self.id, name: self.name, typing: false })
+  }
 }
 
 export async function sendFileMessage(file: File) {
@@ -1253,9 +1306,10 @@ export function toggleHand() {
   const self = state.self
   if (!self || !state.room) return
   const raised = !self.handRaised
-  state.updateParticipant(self.id, { handRaised: raised })
+  const handRaisedAt = raised ? Date.now() : undefined
+  state.updateParticipant(self.id, { handRaised: raised, handRaisedAt })
   realtime?.emit({ type: 'hand', participantId: self.id, raised })
-  realtime?.updateSelf({ ...self, handRaised: raised })
+  realtime?.updateSelf({ ...self, handRaised: raised, handRaisedAt })
 }
 
 /** Broadcasts a short-lived floating reaction to everyone in the room. */

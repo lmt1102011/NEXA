@@ -98,6 +98,7 @@ export interface Participant {
   screenSharing: boolean
   isSpeaking: boolean
   handRaised?: boolean
+  handRaisedAt?: number
   quality: ConnectionQuality
   joinedAt: number
   peerId?: string
@@ -132,6 +133,7 @@ export interface ChatMessage {
   kind: ChatMessageKind
   text: string
   file?: ChatFile
+  replyTo?: { id: ID; name: string; text: string }
   reactions: Record<string, ID[]>
   createdAt: number
 }

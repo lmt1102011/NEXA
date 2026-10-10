@@ -56,6 +56,13 @@ export function ParticipantsPanel() {
 
   const isHost = self?.role === 'host'
   const canModerateSelf = isHost || Boolean(self?.permissions?.canModerate)
+  const raisedHands = useMemo(
+    () =>
+      participants
+        .filter((participant) => participant.handRaised)
+        .sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0)),
+    [participants],
+  )
 
   function togglePermission(participantId: string, current: ParticipantPermissions | undefined, key: keyof ParticipantPermissions) {
     const next: ParticipantPermissions = { ...current }
@@ -132,6 +139,28 @@ export function ParticipantsPanel() {
               aria-label={t('Search participants')}
               className="h-9 pl-8 text-[13px]"
             />
+          </div>
+        </div>
+      ) : null}
+
+      {raisedHands.length > 0 ? (
+        <div className="shrink-0 border-b border-line bg-warning-soft/40 px-3 py-2">
+          <p className="flex items-center gap-1.5 text-[12px] font-medium text-warning">
+            <span aria-hidden>✋</span>
+            {raisedHands.length === 1
+              ? t('1 hand raised')
+              : t('{count} hands raised', { count: raisedHands.length })}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {raisedHands.map((participant, index) => (
+              <span
+                key={participant.id}
+                className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-warning/30 bg-surface px-2 py-0.5 text-[11.5px] text-ink"
+              >
+                <span className="font-mono text-warning">{index + 1}</span>
+                {participant.name}
+              </span>
+            ))}
           </div>
         </div>
       ) : null}

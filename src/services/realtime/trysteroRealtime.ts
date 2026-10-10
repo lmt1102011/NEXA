@@ -23,6 +23,7 @@ const EVENT_TYPES = [
   'reaction',
   'hand',
   'float',
+  'typing',
   'request',
   'snapshot',
   'request-resolved',

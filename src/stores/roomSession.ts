@@ -24,6 +24,11 @@ export interface FloatingReaction {
   x: number
 }
 
+export interface TypingEntry {
+  name: string
+  at: number
+}
+
 interface RoomSessionState {
   status: SessionStatus
   statusDetail: string
@@ -42,6 +47,7 @@ interface RoomSessionState {
   unread: number
   connected: boolean
   floatingReactions: FloatingReaction[]
+  typing: Record<ID, { name: string; at: number }>
 
   reset: () => void
   bootstrap: (roomId: string) => SessionStatus
@@ -80,6 +86,8 @@ interface RoomSessionState {
   pushFloatingReaction: (emoji: string, name: string) => void
   removeFloatingReaction: (id: string) => void
 
+  setTyping: (id: ID, name: string, typing: boolean) => void
+
   applySettingsPatch: (patch: RoomSettingsPatch) => void
 }
 
@@ -101,6 +109,7 @@ const initialState = {
   unread: 0,
   connected: false,
   floatingReactions: [] as FloatingReaction[],
+  typing: {} as Record<ID, { name: string; at: number }>,
 }
 
 const speakingFlags = new Set<ID>()
@@ -334,6 +343,17 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
 
   removeFloatingReaction: (id) =>
     set((state) => ({ floatingReactions: state.floatingReactions.filter((reaction) => reaction.id !== id) })),
+
+  setTyping: (id, name, typing) =>
+    set((state) => {
+      if (!typing) {
+        if (!(id in state.typing)) return state
+        const next = { ...state.typing }
+        delete next[id]
+        return { typing: next }
+      }
+      return { typing: { ...state.typing, [id]: { name, at: Date.now() } } }
+    }),
 
   applySettingsPatch: (patch) =>
     set((state) => {
