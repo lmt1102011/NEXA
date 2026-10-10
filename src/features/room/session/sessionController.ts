@@ -64,17 +64,6 @@ let lastSeen = new Map<ID, number>()
 let activeRoomId: ID | null = null
 let joinApproved = false
 let requestRetryTimer: number | null = null
-let enteredViaLink = false
-
-/**
- * Marks the current session as having been entered through a shared room link
- * (or the public list). People who enter a room this way skip the approval
- * queue: they still complete the pre-join preview (name, mic, camera) but join
- * the room instantly afterwards.
- */
-export function markEnteredViaRoomLink() {
-  enteredViaLink = true
-}
 
 function notify(input: ToastInput) {
   toast(input)
@@ -574,6 +563,9 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'request-resolved': {
       if (event.participantId !== useSessionStore.getState().userId) return
+      // Only the room's host may resolve join requests. When the sender's
+      // identity is known, a spoofed "accepted" from another peer is ignored.
+      if (event.senderId !== undefined && state.room && event.senderId !== state.room.hostId) return
       if (event.accepted) void approveSelf()
       else state.setStatus('rejected', 'Your request was declined by the host.')
       break
@@ -676,7 +668,7 @@ export async function requestJoin(options: JoinOptions) {
   state.setSelf(self)
   state.setStatus('awaiting')
 
-  if (!room.settings.access.requireApproval || enteredViaLink || room.hostId === session.userId) {
+  if (!room.settings.access.requireApproval || room.hostId === session.userId) {
     await approveSelf()
     return
   }
@@ -953,8 +945,20 @@ function patchTask(taskId: ID, patch: Partial<ActivityTask>) {
   if (!self) return
   const target = state.tasks.find((task) => task.id === taskId)
   if (!target) return
-  const isEditByOther = patch.done === undefined && patch.assigneeId === undefined
-  if (isEditByOther && !canEditActivity(self, target.createdBy)) return
+
+  // Completing a task is the assignee's job. Unassigned tasks fall back to the
+  // host/moderator/creator so they don't get stuck forever.
+  if (patch.done !== undefined && patch.done !== target.done) {
+    const canToggle =
+      target.assigneeId != null ? target.assigneeId === self.id : canEditActivity(self, target.createdBy)
+    if (!canToggle) return
+  }
+  // Reassigning (or leaving a note on) a task stays with the host, moderators,
+  // and whoever created it.
+  if ((patch.assigneeId !== undefined || patch.note !== undefined) && !canEditActivity(self, target.createdBy)) {
+    return
+  }
+
   const activities = {
     ...currentActivities(),
     tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
@@ -1007,6 +1011,10 @@ export function addTodo(text: string, note = '') {
 
 export function toggleTodo(todoId: ID) {
   const state = store()
+  const self = state.self
+  const target = state.todos.find((todo) => todo.id === todoId)
+  // To-do lists are personal: only their owner can tick an item.
+  if (!self || !target || target.createdBy !== self.id) return
   const activities = {
     ...currentActivities(),
     todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, done: !todo.done } : todo)),
@@ -1019,7 +1027,7 @@ export function deleteTodo(todoId: ID) {
   const state = store()
   const self = state.self
   const target = state.todos.find((todo) => todo.id === todoId)
-  if (!self || !target || !canEditActivity(self, target.createdBy)) return
+  if (!self || !target || target.createdBy !== self.id) return
   const activities = { ...currentActivities(), todos: state.todos.filter((todo) => todo.id !== todoId) }
   state.setActivities(activities)
   publishActivities(activities)

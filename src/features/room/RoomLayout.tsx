@@ -9,7 +9,7 @@ import { useRoomsStore } from '@/stores/rooms'
 import { useDirectoryStore } from '@/stores/directory'
 import { useUiStore } from '@/stores/ui'
 import { roomFromInviteParams } from '@/lib/invite'
-import { initRoom, markEnteredViaRoomLink, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
+import { initRoom, toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
 import { RoomHeader } from '@/features/room/RoomHeader'
 import { NameConflictBar } from '@/features/room/NameConflictBar'
 import { TimeUpOverlay } from '@/features/room/activities/TimeUpOverlay'
@@ -62,7 +62,6 @@ export default function RoomLayout() {
       const remote = invited ?? useDirectoryStore.getState().findRoom(roomId)
       if (remote) {
         useRoomsStore.getState().addRoom(remote)
-        markEnteredViaRoomLink()
         started = true
         cleanup = initRoom(roomId)
       }

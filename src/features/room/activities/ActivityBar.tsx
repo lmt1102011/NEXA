@@ -46,7 +46,7 @@ import {
   votePoll,
 } from '@/features/room/session/sessionController'
 import { formatDuration } from '@/lib/utils'
-import type { ActivityTask } from '@/types'
+import type { ActivityTask, TodoItem } from '@/types'
 
 type ActivityKind = 'timer' | 'poll' | 'task' | 'todo'
 
@@ -78,10 +78,13 @@ const triggerClass =
 
 export function ActivityBar() {
   const t = useT()
+  const self = useRoomSessionStore((state) => state.self)
   const pollCount = useRoomSessionStore((state) => state.polls.length)
   const taskCount = useRoomSessionStore((state) => state.tasks.length)
-  const todoCount = useRoomSessionStore((state) => state.todos.length)
+  const todos = useRoomSessionStore((state) => state.todos)
   const hasTimer = useRoomSessionStore((state) => Boolean(state.timer))
+  const isModerator = Boolean(self && (self.role === 'host' || self.permissions?.canModerate))
+  const todoCount = isModerator ? todos.length : todos.filter((todo) => todo.createdBy === self?.id).length
   const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const markActivitiesRead = useRoomSessionStore((state) => state.markActivitiesRead)
   const [openKind, setOpenKind] = useState<ActivityKind | null>(null)
@@ -125,7 +128,7 @@ export function ActivityBar() {
             ) : null}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" sideOffset={6} className="w-56 p-1.5">
+        <PopoverContent align="start" sideOffset={6} className="w-56 p-1.5">
           <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
             {t('Add activity')}
           </p>
@@ -172,7 +175,7 @@ export function ActivityBar() {
                 )}
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={6} className="w-[min(380px,calc(100vw-2rem))] p-0">
+            <PopoverContent align="start" sideOffset={6} className="w-[min(380px,calc(100vw-2rem))] p-0">
               <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
                   <Icon className="h-4 w-4" />
@@ -317,6 +320,11 @@ function TaskRow({ task }: { task: ActivityTask }) {
   const [noteDraft, setNoteDraft] = useState(task.note)
   const editable = canEdit(task.createdBy)
   const mine = Boolean(self && task.assigneeId === self.id)
+  // Only the assignee ticks a task; unassigned tasks fall back to host/moderator/creator.
+  const canToggle = task.assigneeId != null ? mine : editable
+  const assigneeName = task.assigneeId
+    ? participants.find((participant) => participant.id === task.assigneeId)?.name ?? t('Unknown')
+    : t('Unassigned')
 
   return (
     <div
@@ -328,11 +336,13 @@ function TaskRow({ task }: { task: ActivityTask }) {
       <div className="flex items-start gap-2.5">
         <button
           type="button"
+          disabled={!canToggle}
           aria-label={task.done ? t('Mark as not done') : t('Mark as done')}
           onClick={() => toggleTask(task.id)}
           className={cn(
             'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors',
             task.done ? 'border-accent bg-accent-solid text-white' : 'border-line bg-surface-2 hover:border-line-strong',
+            !canToggle && 'cursor-not-allowed opacity-50 hover:border-line',
           )}
         >
           {task.done ? <Check className="h-3.5 w-3.5" /> : null}
@@ -350,20 +360,26 @@ function TaskRow({ task }: { task: ActivityTask }) {
                 {t('Yours')}
               </Badge>
             ) : null}
-            <select
-              value={task.assigneeId ?? ''}
-              onChange={(event) => setTaskAssignee(task.id, event.target.value || null)}
-              aria-label={t('Assignee')}
-              className="h-7 max-w-[140px] rounded-lg border border-line bg-surface-2 px-2 text-[12px] text-ink-muted transition-colors hover:border-line-strong focus:border-accent focus:outline-none"
-            >
-              <option value="">{t('Unassigned')}</option>
-              {participants.map((participant) => (
-                <option key={participant.id} value={participant.id}>
-                  {participant.name}
-                  {participant.isSelf ? ` ${t('(You)')}` : ''}
-                </option>
-              ))}
-            </select>
+            {editable ? (
+              <select
+                value={task.assigneeId ?? ''}
+                onChange={(event) => setTaskAssignee(task.id, event.target.value || null)}
+                aria-label={t('Assignee')}
+                className="h-7 max-w-[140px] rounded-lg border border-line bg-surface-2 px-2 text-[12px] text-ink-muted transition-colors hover:border-line-strong focus:border-accent focus:outline-none"
+              >
+                <option value="">{t('Unassigned')}</option>
+                {participants.map((participant) => (
+                  <option key={participant.id} value={participant.id}>
+                    {participant.name}
+                    {participant.isSelf ? ` ${t('(You)')}` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11.5px] text-ink-subtle">
+                {assigneeName}
+              </span>
+            )}
             {editable ? (
               <>
                 <button
@@ -407,57 +423,103 @@ function TaskRow({ task }: { task: ActivityTask }) {
 
 function TodosList() {
   const todos = useRoomSessionStore((state) => state.todos)
-  const { canEdit } = useActivityPermissions()
+  const self = useRoomSessionStore((state) => state.self)
+  const participants = useRoomSessionStore((state) => state.participants)
   const t = useT()
 
-  if (todos.length === 0) return null
-  const doneCount = todos.filter((todo) => todo.done).length
+  if (!self || todos.length === 0) return null
+  const isModerator = self.role === 'host' || Boolean(self.permissions?.canModerate)
+  const mine = todos.filter((todo) => todo.createdBy === self.id)
+
+  // Everyone gets their own private list.
+  if (!isModerator) {
+    if (mine.length === 0) return null
+    const doneCount = mine.filter((todo) => todo.done).length
+    return (
+      <>
+        <p className="text-[11.5px] text-ink-subtle">
+          {t('{done}/{total} done', { done: doneCount, total: mine.length })}
+        </p>
+        <div className="space-y-1.5">
+          {mine.map((todo) => (
+            <TodoRow key={todo.id} todo={todo} readOnly={false} />
+          ))}
+        </div>
+      </>
+    )
+  }
+
+  // Host/moderators get a read-only view of everyone's progress.
+  const order: string[] = []
+  const groups = new Map<string, TodoItem[]>()
+  for (const todo of todos) {
+    let list = groups.get(todo.createdBy)
+    if (!list) {
+      list = []
+      groups.set(todo.createdBy, list)
+      order.push(todo.createdBy)
+    }
+    list.push(todo)
+  }
+  order.sort((a, b) => (a === self.id ? -1 : b === self.id ? 1 : 0))
 
   return (
     <>
-      <p className="text-[11.5px] text-ink-subtle">
-        {t('{done}/{total} done', { done: doneCount, total: todos.length })}
-      </p>
-      <div className="space-y-1.5">
-        {todos.map((todo) => (
-          <div key={todo.id} className="flex items-start gap-2.5 rounded-lg border border-line bg-surface px-2.5 py-2">
-            <button
-              type="button"
-              aria-label={todo.done ? t('Mark as not done') : t('Mark as done')}
-              onClick={() => toggleTodo(todo.id)}
-              className={cn(
-                'mt-0.5 grid shrink-0 place-items-center rounded-md border transition-colors',
-                todo.done ? 'border-accent bg-accent-solid text-white' : 'border-line bg-surface-2 hover:border-line-strong',
-              )}
-              style={{ height: 18, width: 18 }}
-            >
-              {todo.done ? <Check className="h-3 w-3" /> : null}
-            </button>
-            <div className="min-w-0 flex-1">
-              <span
-                className={cn(
-                  'block text-[13px]',
-                  todo.done ? 'text-ink-subtle line-through' : 'text-ink',
-                )}
-              >
-                {todo.text}
-              </span>
-              {activityNote(todo.note)}
-            </div>
-            {canEdit(todo.createdBy) ? (
-              <button
-                type="button"
-                aria-label={t('Delete to-do item')}
-                onClick={() => deleteTodo(todo.id)}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-danger"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
+      {order.map((ownerId) => {
+        const items = groups.get(ownerId) ?? []
+        const doneCount = items.filter((todo) => todo.done).length
+        const owner = participants.find((participant) => participant.id === ownerId)
+        const label = ownerId === self.id ? t('You') : owner?.name ?? t('Unknown')
+        return (
+          <div key={ownerId} className="space-y-1.5">
+            <p className="text-[11.5px] font-medium text-ink-subtle">
+              {label} · {t('{done}/{total} done', { done: doneCount, total: items.length })}
+            </p>
+            {items.map((todo) => (
+              <TodoRow key={todo.id} todo={todo} readOnly={ownerId !== self.id} />
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })}
     </>
+  )
+}
+
+function TodoRow({ todo, readOnly }: { todo: TodoItem; readOnly: boolean }) {
+  const t = useT()
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-line bg-surface px-2.5 py-2">
+      <button
+        type="button"
+        disabled={readOnly}
+        aria-label={todo.done ? t('Mark as not done') : t('Mark as done')}
+        onClick={() => toggleTodo(todo.id)}
+        className={cn(
+          'mt-0.5 grid shrink-0 place-items-center rounded-md border transition-colors',
+          todo.done ? 'border-accent bg-accent-solid text-white' : 'border-line bg-surface-2 hover:border-line-strong',
+          readOnly && 'cursor-not-allowed opacity-60',
+        )}
+        style={{ height: 18, width: 18 }}
+      >
+        {todo.done ? <Check className="h-3 w-3" /> : null}
+      </button>
+      <div className="min-w-0 flex-1">
+        <span className={cn('block text-[13px]', todo.done ? 'text-ink-subtle line-through' : 'text-ink')}>
+          {todo.text}
+        </span>
+        {activityNote(todo.note)}
+      </div>
+      {!readOnly ? (
+        <button
+          type="button"
+          aria-label={t('Delete to-do item')}
+          onClick={() => deleteTodo(todo.id)}
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-danger"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+    </div>
   )
 }
 

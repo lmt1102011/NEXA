@@ -44,7 +44,7 @@ interface StatsBucket {
  * participant id to these so the session can refuse actions that did not come
  * from the room's host (or a granted moderator).
  */
-const SENDER_VERIFIED_EVENTS: ReadonlySet<string> = new Set(['settings', 'kick', 'end', 'host-transfer'])
+const SENDER_VERIFIED_EVENTS: ReadonlySet<string> = new Set(['settings', 'kick', 'end', 'host-transfer', 'request-resolved'])
 
 /**
  * Serverless WebRTC transport built on Trystero. Peers discover each other

@@ -18,7 +18,7 @@ export type RoomEvent =
     }
   | { type: 'reaction'; messageId: ID; emoji: string; userId: ID }
   | { type: 'request'; request: JoinRequest }
-  | { type: 'request-resolved'; requestId: ID; participantId: ID; accepted: boolean }
+  | { type: 'request-resolved'; requestId: ID; participantId: ID; accepted: boolean; senderId?: ID }
   | { type: 'settings'; patch: RoomSettingsPatch }
   | { type: 'kick'; participantId: ID }
   | { type: 'name-taken'; participantId: ID; name: string }

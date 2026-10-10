@@ -76,10 +76,10 @@ export function RoomHeader() {
         ) : null}
       </div>
 
+      <ActivityBar />
+
       <div className="ml-auto flex items-center gap-1.5">
         <ConnectionRadar className="hidden sm:inline-flex" />
-
-        <ActivityBar />
 
         {fullscreenSupported ? (
           <button
