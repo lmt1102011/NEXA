@@ -41,7 +41,7 @@ export default function RoomsPage() {
       list = list.filter(
         (room) =>
           room.name.toLowerCase().includes(normalized) ||
-          room.code.toLowerCase().includes(normalized) ||
+          (room.settings.access.allowJoinByCode && room.code.toLowerCase().includes(normalized)) ||
           room.hostName.toLowerCase().includes(normalized),
       )
     }
@@ -64,7 +64,8 @@ export default function RoomsPage() {
       localRooms.find(
         (room) =>
           room.visibility === 'private' &&
-          (room.code.toLowerCase() === normalized || room.name.toLowerCase() === normalized),
+          (room.name.toLowerCase() === normalized ||
+            (room.settings.access.allowJoinByCode && room.code.toLowerCase() === normalized)),
       ) ?? null
     )
   }, [localRooms, query])

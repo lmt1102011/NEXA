@@ -50,6 +50,7 @@ export function ParticipantsPanel() {
   const participants = useRoomSessionStore((state) => state.participants)
   const requests = useRoomSessionStore((state) => state.requests)
   const self = useRoomSessionStore((state) => state.self)
+  const settings = useRoomSessionStore((state) => state.room?.settings)
   const t = useT()
   const [query, setQuery] = useState('')
 
@@ -188,7 +189,10 @@ export function ParticipantsPanel() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>{participant.name}</DropdownMenuLabel>
-                    <DropdownMenuItem disabled={!participant.micOn} onSelect={() => hostMuteParticipant(participant.id)}>
+                    <DropdownMenuItem
+                      disabled={!participant.micOn || settings?.participants.allowMuteOthers === false}
+                      onSelect={() => hostMuteParticipant(participant.id)}
+                    >
                       <MicOff className="h-4 w-4" />
                       {t('Mute')}
                     </DropdownMenuItem>
@@ -245,7 +249,11 @@ export function ParticipantsPanel() {
                     ) : null}
 
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem destructive onSelect={() => hostRemoveParticipant(participant.id)}>
+                    <DropdownMenuItem
+                      destructive
+                      disabled={settings?.participants.allowRemoveOthers === false}
+                      onSelect={() => hostRemoveParticipant(participant.id)}
+                    >
                       <Trash className="h-4 w-4" />
                       {t('Remove from room')}
                     </DropdownMenuItem>

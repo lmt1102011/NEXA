@@ -16,8 +16,8 @@ export function defaultRoomSettings(): RoomSettings {
       maxParticipants: 12,
       defaultMic: true,
       defaultCamera: true,
-      allowMuteOthers: false,
-      allowRemoveOthers: false,
+      allowMuteOthers: true,
+      allowRemoveOthers: true,
     },
     av: {
       videoQuality: 'auto',

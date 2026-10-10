@@ -38,7 +38,7 @@ export default function HomePage() {
     return rooms.filter(
       (room) =>
         room.name.toLowerCase().includes(normalized) ||
-        room.code.toLowerCase().includes(normalized) ||
+        (room.settings.access.allowJoinByCode && room.code.toLowerCase().includes(normalized)) ||
         room.hostName.toLowerCase().includes(normalized),
     )
   }, [rooms, query])

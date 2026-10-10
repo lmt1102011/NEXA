@@ -37,6 +37,7 @@ export const VideoTile = memo(function VideoTile({
   const isSelf = participant.isSelf
   const self = useRoomSessionStore((state) => state.self)
   const canModerateSelf = self?.role === 'host' || Boolean(self?.permissions?.canModerate)
+  const settings = useRoomSessionStore((state) => state.room?.settings)
   const hasLocalVideo = useCallStore((state) => state.hasLocalVideo)
   const remoteStream = useCallStore((state) =>
     !isSelf && participant.peerId ? state.remoteStreams[participant.peerId] : undefined,
@@ -229,19 +230,26 @@ export const VideoTile = memo(function VideoTile({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{participant.name}</DropdownMenuLabel>
-              <DropdownMenuItem disabled={!participant.micOn} onSelect={() => hostMuteParticipant(participant.id)}>
+              <DropdownMenuItem
+                disabled={!participant.micOn || settings?.participants.allowMuteOthers === false}
+                onSelect={() => hostMuteParticipant(participant.id)}
+              >
                 <MicOff className="h-4 w-4" />
                 {t('Mute mic')}
               </DropdownMenuItem>
               <DropdownMenuItem
-                disabled={!participant.cameraOn}
+                disabled={!participant.cameraOn || settings?.participants.allowMuteOthers === false}
                 onSelect={() => hostDisableCamera(participant.id)}
               >
                 <VideoOff className="h-4 w-4" />
                 {t('Turn off camera')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem destructive onSelect={() => hostRemoveParticipant(participant.id)}>
+              <DropdownMenuItem
+                destructive
+                disabled={settings?.participants.allowRemoveOthers === false}
+                onSelect={() => hostRemoveParticipant(participant.id)}
+              >
                 <Trash className="h-4 w-4" />
                 {t('Remove from room')}
               </DropdownMenuItem>

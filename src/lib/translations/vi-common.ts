@@ -29,6 +29,11 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Check your device settings and browser permissions.': 'Kiểm tra cài đặt thiết bị và quyền của trình duyệt.',
   'Screen sharing is disabled by the host': 'Chủ phòng đã tắt chia sẻ màn hình',
   'Only the host can share their screen': 'Chỉ chủ phòng mới có thể chia sẻ màn hình',
+  'Reactions are disabled in this room': 'Cảm xúc đã bị tắt trong phòng này',
+  'Muting others is disabled in this room': 'Chủ phòng đã tắt tính năng tắt mic người khác',
+  'The host disabled turning off others’ cameras': 'Chủ phòng đã tắt tính năng tắt camera người khác',
+  'The host disabled removing others': 'Chủ phòng đã tắt tính năng xóa người khác',
+  'This temporary room has ended': 'Phòng tạm thời này đã kết thúc',
 
   // ---- notifications: names / roles ----
   'Name is already taken': 'Tên đã được sử dụng',

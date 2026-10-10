@@ -188,6 +188,7 @@ export function ChatPanel() {
 function ChatRow({ message }: { message: ChatMessage }) {
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
+  const settings = useRoomSessionStore((state) => state.room?.settings)
   const t = useT()
   const { copied, copy } = useCopy()
   const [actionsOpen, setActionsOpen] = useState(false)
@@ -214,6 +215,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
   }
 
   const own = message.senderId === self?.id
+  const allowReactions = Boolean(settings?.chat.enabled && settings.chat.allowReactions)
   const reactionEntries = Object.entries(message.reactions)
   const mineActive = (emoji: string) => (message.reactions[emoji] ?? []).includes(self?.id ?? '')
   const canPin = own || self?.role === 'host' || Boolean(self?.permissions?.canModerate)
@@ -310,46 +312,50 @@ function ChatRow({ message }: { message: ChatMessage }) {
         ) : null}
 
         <div className={cn('mt-1 flex flex-wrap items-center gap-1.5', own && 'flex-row-reverse')}>
-          {reactionEntries.map(([emoji, users]) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => toggleReaction(message.id, emoji)}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11.5px] transition-colors',
-                mineActive(emoji)
-                  ? 'border-accent/50 bg-accent-soft text-accent'
-                  : 'border-line bg-surface-2 text-ink-muted hover:border-line-strong',
-              )}
-            >
-              <span>{emoji}</span>
-              <span className="font-mono">{users.length}</span>
-            </button>
-          ))}
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label={t('Add reaction')}
-                className="grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 text-ink-subtle transition-opacity hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
-              >
-                <IconSmile className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align={own ? 'end' : 'start'} className="flex gap-1 p-1.5">
-              {QUICK_EMOJI.map((emoji) => (
+          {allowReactions ? (
+            <>
+              {reactionEntries.map(([emoji, users]) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => toggleReaction(message.id, emoji)}
-                  className="grid h-8 w-8 place-items-center rounded-lg text-[16px] transition-colors hover:bg-surface-3"
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11.5px] transition-colors',
+                    mineActive(emoji)
+                      ? 'border-accent/50 bg-accent-soft text-accent'
+                      : 'border-line bg-surface-2 text-ink-muted hover:border-line-strong',
+                  )}
                 >
-                  {emoji}
+                  <span>{emoji}</span>
+                  <span className="font-mono">{users.length}</span>
                 </button>
               ))}
-            </PopoverContent>
-          </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t('Add reaction')}
+                    className="grid h-6 w-6 place-items-center rounded-full border border-line bg-surface-2 text-ink-subtle transition-opacity hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                  >
+                    <IconSmile className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align={own ? 'end' : 'start'} className="flex gap-1 p-1.5">
+                  {QUICK_EMOJI.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => toggleReaction(message.id, emoji)}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-[16px] transition-colors hover:bg-surface-3"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            </>
+          ) : null}
 
           {canPin ? (
             <button

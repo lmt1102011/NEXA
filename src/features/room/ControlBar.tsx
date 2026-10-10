@@ -34,6 +34,7 @@ interface ControlItem {
   ariaLabel: string
   onClick: () => void
   danger?: boolean
+  disabled?: boolean
 }
 
 function toneClass(item: ControlItem, mobile: boolean) {
@@ -78,9 +79,11 @@ function DesktopControl({ item }: { item: ControlItem }) {
       onClick={item.onClick}
       aria-label={item.ariaLabel}
       aria-pressed={item.active}
+      disabled={item.disabled}
       className={cn(
         'relative inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-medium transition-[background-color,border-color,color,filter] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 active:scale-[0.97] xl:px-3.5',
         toneClass(item, false),
+        item.disabled && 'cursor-not-allowed opacity-40 hover:brightness-100',
       )}
     >
       <span className="relative">
@@ -102,9 +105,11 @@ function MobileControl({ item }: { item: ControlItem }) {
       onClick={item.onClick}
       aria-label={item.ariaLabel}
       aria-pressed={item.active}
+      disabled={item.disabled}
       className={cn(
         'relative flex h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-xl border px-1 transition-[background-color,border-color,color] duration-150 active:scale-95',
         toneClass(item, true),
+        item.disabled && 'cursor-not-allowed opacity-40',
       )}
     >
       <span className="relative">
@@ -139,6 +144,12 @@ export function ControlBar() {
   const camBlocked = videoPermission === 'denied' || videoPermission === 'unavailable'
   const micAvailable = micOn && !micBlocked
   const camAvailable = cameraOn && !camBlocked
+  const canShare = room
+    ? room.settings.screenShare.allow &&
+      (self?.role === 'host' ||
+        Boolean(self?.permissions?.canShareScreen) ||
+        room.settings.screenShare.allowParticipants)
+    : false
 
   const items: ControlItem[] = [
     {
@@ -169,6 +180,7 @@ export function ControlBar() {
       shortcut: 'S',
       ariaLabel: sharing ? t('Stop screen sharing') : t('Share your screen'),
       onClick: () => void toggleScreenShare(),
+      disabled: !sharing && !canShare,
     },
     { key: 'divider-1', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {

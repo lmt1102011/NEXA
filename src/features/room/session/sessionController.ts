@@ -77,6 +77,7 @@ let activeRoomId: ID | null = null
 let joinApproved = false
 let requestRetryTimer: number | null = null
 let reconnectTimer: number | null = null
+let expireTimer: number | null = null
 let remotePeerSeen = false
 let droppedPeersBySilence = false
 let reconnectAttempts = 0
@@ -129,6 +130,7 @@ export function initRoom(roomId: ID): () => void {
     wireSelfMedia()
     startStatsMonitor()
     startPresenceMonitor()
+    scheduleAutoExpire()
     void prepareMedia(
       store().room?.settings.participants.defaultMic ?? true,
       store().room?.settings.participants.defaultCamera ?? true,
@@ -247,6 +249,7 @@ function stopLocalMedia() {
   offStream = null
   stopPresenceMonitor()
   stopReconnectMonitor()
+  stopAutoExpire()
   cleanupTransport()
   mediaEngine.dispose()
   useCallStore.getState().reset()
@@ -838,6 +841,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     }
     case 'reaction': {
+      if (!state.room?.settings.chat.allowReactions) break
       if (!event.senderId || event.userId !== event.senderId) break
       if (typeof event.emoji !== 'string' || event.emoji.length === 0 || event.emoji.length > 16) break
       state.toggleReaction(event.messageId, event.emoji, event.userId)
@@ -845,6 +849,17 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'request': {
       if (!isAuthenticatedHost()) return
+      // "Block join requests" pauses the waiting room: politely turn the joiner
+      // away instead of letting them hang, without locking the room outright.
+      if (store().room?.settings.security.blockJoinRequests) {
+        realtime?.emit({
+          type: 'request-resolved',
+          requestId: event.request.id,
+          participantId: event.request.participantId,
+          accepted: false,
+        })
+        return
+      }
       const rosterClash = nameTakenBy(event.request.name, event.request.participantId)
       const requestClash =
         store()
@@ -879,6 +894,7 @@ function handleRealtimeEvent(event: RoomEvent) {
     case 'settings': {
       if (!senderIsHost(event) && !senderCanManage(event.senderId)) break
       state.applySettingsPatch(event.patch)
+      if (event.patch.security) scheduleAutoExpire()
       if (event.patch.access?.lockRoom !== undefined) {
         state.addMessage(
           buildSystemMessage(activeRoomId ?? '', event.patch.access.lockRoom ? t('Room was locked') : t('Room was unlocked')),
@@ -1135,7 +1151,11 @@ function readFileAsDataURL(file: File): Promise<string> {
 export function toggleReaction(messageId: ID, emoji: string) {
   const state = store()
   const self = state.self
-  if (!self) return
+  if (!self || !state.room) return
+  if (!state.room.settings.chat.enabled || !state.room.settings.chat.allowReactions) {
+    notify({ title: t('Reactions are disabled in this room'), variant: 'warning' })
+    return
+  }
   state.toggleReaction(messageId, emoji, self.id)
   realtime?.emit({ type: 'reaction', messageId, emoji, userId: self.id })
 }
@@ -1473,6 +1493,18 @@ export async function toggleScreenShare() {
     return
   }
 
+  const activeShares = state.participants.filter((participant) => participant.screenSharing).length
+  if (activeShares >= room.settings.screenShare.maxScreens) {
+    notify({
+      title: t('Screen share limit reached'),
+      description: t('The host allows up to {count} simultaneous screens.', {
+        count: room.settings.screenShare.maxScreens,
+      }),
+      variant: 'warning',
+    })
+    return
+  }
+
   const started = await mediaEngine.startScreenShare()
   if (!started) {
     notify({
@@ -1537,6 +1569,7 @@ export function applyHostSettings(patch: RoomSettingsPatch) {
   if (!self || (!isAuthenticatedHost() && !self.permissions?.canManageRoom)) return
   state.applySettingsPatch(patch)
   realtime?.emit({ type: 'settings', patch })
+  if (patch.security) scheduleAutoExpire()
 }
 
 /**
@@ -1564,6 +1597,10 @@ function canModerate(): boolean {
 export function hostMuteParticipant(participantId: ID) {
   const state = store()
   if (!canModerate()) return
+  if (state.room && !state.room.settings.participants.allowMuteOthers) {
+    notify({ title: t('Muting others is disabled in this room'), variant: 'warning' })
+    return
+  }
   const target = state.participants.find((participant) => participant.id === participantId)
   if (!target || target.role === 'host') return
   state.updateParticipant(participantId, { micOn: false })
@@ -1574,6 +1611,10 @@ export function hostMuteParticipant(participantId: ID) {
 export function hostDisableCamera(participantId: ID) {
   const state = store()
   if (!canModerate()) return
+  if (state.room && !state.room.settings.participants.allowMuteOthers) {
+    notify({ title: t('The host disabled turning off others’ cameras'), variant: 'warning' })
+    return
+  }
   const target = state.participants.find((participant) => participant.id === participantId)
   if (!target || target.role === 'host') return
   state.updateParticipant(participantId, { cameraOn: false })
@@ -1584,6 +1625,10 @@ export function hostDisableCamera(participantId: ID) {
 export function hostRemoveParticipant(participantId: ID) {
   const state = store()
   if (!canModerate()) return
+  if (state.room && !state.room.settings.participants.allowRemoveOthers) {
+    notify({ title: t('The host disabled removing others'), variant: 'warning' })
+    return
+  }
   const target = state.participants.find((participant) => participant.id === participantId)
   if (!target || target.role === 'host') return
   state.removeParticipant(participantId)
@@ -1640,9 +1685,38 @@ export function hostLeaveWithDelegate(participantId: ID, note?: string) {
   leaveRoom()
 }
 
+/**
+ * (Re)schedules the temporary-room countdown. Only the authenticated host arms
+ * it, since ending the room is a host action; changing the setting cancels the
+ * previous timer first so the schedule always matches the saved settings.
+ */
+function scheduleAutoExpire() {
+  if (expireTimer !== null) {
+    window.clearTimeout(expireTimer)
+    expireTimer = null
+  }
+  const room = store().room
+  if (!room || !isAuthenticatedHost()) return
+  const { temporary, autoExpireMinutes } = room.settings.security
+  if (!temporary || autoExpireMinutes <= 0) return
+  expireTimer = window.setTimeout(() => {
+    expireTimer = null
+    if (isAuthenticatedHost() && store().room?.settings.security.temporary) {
+      notify({ title: t('This temporary room has ended'), variant: 'info', duration: 5000 })
+      hostEndRoom()
+    }
+  }, autoExpireMinutes * 60_000)
+}
+
+function stopAutoExpire() {
+  if (expireTimer !== null) window.clearTimeout(expireTimer)
+  expireTimer = null
+}
+
 export function hostEndRoom() {
   const state = store()
   if (!isAuthenticatedHost()) return
+  stopAutoExpire()
   realtime?.emit({ type: 'end' })
   stopLocalMedia()
   state.setStatus('ended')
