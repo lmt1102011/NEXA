@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ClipboardCheck,
+  Disc3,
   Lock,
   Maximize,
   Minimize,
@@ -14,10 +15,36 @@ import { Button } from '@/components/ui/button'
 import { LogoMark } from '@/components/brand/logo'
 import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
+import { useCallStore } from '@/stores/call'
 import { useUiStore } from '@/stores/ui'
 import { ConnectionRadar } from '@/features/room/ConnectionRadar'
 import { ActivityBar } from '@/features/room/activities/ActivityBar'
 import { TaskManagerDialog } from '@/features/room/activities/TaskManagerDialog'
+
+function RecordingBadge() {
+  const t = useT()
+  const startedAt = useCallStore((state) => state.recordingStartedAt)
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000))
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0')
+  const ss = String(elapsed % 60).padStart(2, '0')
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-danger/40 bg-danger-soft px-2 py-0.5 text-[11.5px] font-medium text-danger">
+      <Disc3 className="h-3 w-3 animate-pulse" />
+      <span className="hidden sm:inline">{t('Rec')}</span>
+      <span className="font-mono tabular-nums">
+        {mm}:{ss}
+      </span>
+    </span>
+  )
+}
 
 export function RoomHeader() {
   const t = useT()
@@ -27,6 +54,7 @@ export function RoomHeader() {
   const participantCount = useRoomSessionStore((state) => state.participants.length)
   const setPanel = useUiStore((state) => state.setPanel)
   const setModal = useUiStore((state) => state.setModal)
+  const recording = useCallStore((state) => state.recording)
 
   const [fullscreen, setFullscreen] = useState(false)
   const [taskManagerOpen, setTaskManagerOpen] = useState(false)
@@ -77,6 +105,7 @@ export function RoomHeader() {
             <span className="hidden sm:inline">{t('Locked')}</span>
           </Badge>
         ) : null}
+        {recording ? <RecordingBadge /> : null}
       </div>
 
       {isHost ? (

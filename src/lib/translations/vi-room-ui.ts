@@ -209,6 +209,23 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   'Room menu': 'Thực đơn phòng',
   'Everything else you can do here.': 'Mọi thứ khác bạn có thể làm ở đây.',
 
+  // ── Local recording ───────────────────────────────────────────
+  Record: 'Ghi lại',
+  Rec: 'GHI',
+  'Start recording': 'Bắt đầu ghi',
+  'Stop recording': 'Dừng ghi',
+  'Recording started': 'Đã bắt đầu ghi',
+  'Recording stopped': 'Đã dừng ghi',
+  'Recording saved': 'Đã lưu bản ghi',
+  '{name} was downloaded to this device.': '{name} đã được tải về thiết bị này.',
+  'Recording is not supported on this device': 'Thiết bị này không hỗ trợ ghi lại',
+  'Your browser cannot record media locally.': 'Trình duyệt của bạn không thể ghi lại nội dung cục bộ.',
+  'Nothing to record yet': 'Chưa có gì để ghi',
+  'Turn on your camera or microphone first.': 'Bật camera hoặc mic trước đã.',
+  'Could not start recording': 'Không thể bắt đầu ghi',
+  'Capturing video and audio locally.': 'Đang ghi hình và âm thanh cục bộ.',
+  'Capturing audio locally.': 'Đang ghi âm cục bộ.',
+
   // ── Shortcuts dialog ──────────────────────────────────────────
   'Move faster without leaving the keyboard.': 'Làm việc nhanh hơn mà không cần rời bàn phím.',
   'Toggle microphone': 'Bật/tắt mic',

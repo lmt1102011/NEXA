@@ -18,6 +18,7 @@ import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { qualityController } from '@/services/media/QualityController'
+import { recordingEngine } from '@/services/media/RecordingEngine'
 import { announceRoomDeletion } from '@/services/directory/PublicRoomsDirectory'
 import { buildFileMessage, buildSystemMessage, buildTextMessage } from '@/lib/chat'
 import { generateId, createHostToken } from '@/lib/utils'
@@ -105,6 +106,7 @@ let reconnectAttempts = 0
 let hardReconnects = 0
 let lastTypingSent = 0
 let typingActive = false
+let recordingListenerAttached = false
 const typingTimers = new Map<ID, number>()
 
 function notify(input: ToastInput) {
@@ -275,6 +277,7 @@ function stopLocalMedia() {
   stopReconnectMonitor()
   stopAutoExpire()
   cleanupTransport()
+  if (recordingEngine.recording) recordingEngine.stop()
   mediaEngine.dispose()
   useCallStore.getState().reset()
 }
@@ -1679,6 +1682,76 @@ export async function toggleScreenShare() {
   call.setSharing(true)
   syncSelf()
   pushOutgoingStream()
+}
+
+/** Downloads the finished recording when the recorder stops. */
+function ensureRecordingListener() {
+  if (recordingListenerAttached) return
+  recordingListenerAttached = true
+  recordingEngine.onResult(({ blob, fileName }) => {
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000)
+    notify({
+      title: t('Recording saved'),
+      description: t('{name} was downloaded to this device.', { name: fileName }),
+    })
+  })
+}
+
+/**
+ * Starts or stops a local recording of your own media. Screen share wins when
+ * active (that is the content being presented); otherwise the camera is used.
+ * Microphone audio is always included when available.
+ */
+export function toggleRecording() {
+  const call = useCallStore.getState()
+  if (!recordingEngine.supported) {
+    notify({
+      title: t('Recording is not supported on this device'),
+      description: t('Your browser cannot record media locally.'),
+      variant: 'warning',
+    })
+    return
+  }
+  ensureRecordingListener()
+
+  if (call.recording) {
+    recordingEngine.stop()
+    call.setRecording(false)
+    notify({ title: t('Recording stopped'), variant: 'default' })
+    return
+  }
+
+  const videoTrack = (mediaEngine.getScreenStream() ?? mediaEngine.getStream())?.getVideoTracks()[0]
+  const audioTrack = mediaEngine.getStream()?.getAudioTracks()[0]
+  const tracks: MediaStreamTrack[] = []
+  if (videoTrack) tracks.push(videoTrack)
+  if (audioTrack) tracks.push(audioTrack.clone())
+
+  if (tracks.length === 0) {
+    notify({
+      title: t('Nothing to record yet'),
+      description: t('Turn on your camera or microphone first.'),
+      variant: 'warning',
+    })
+    return
+  }
+
+  if (!recordingEngine.start(new MediaStream(tracks))) {
+    notify({ title: t('Could not start recording'), variant: 'danger' })
+    return
+  }
+  call.setRecording(true, Date.now())
+  notify({
+    title: t('Recording started'),
+    description: videoTrack ? t('Capturing video and audio locally.') : t('Capturing audio locally.'),
+  })
 }
 
 export async function switchDevice(kind: 'audio' | 'video', deviceId: string) {

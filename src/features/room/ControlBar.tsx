@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Camera,
   CameraOff,
+  Disc3,
   Ellipsis,
   Hand,
   Keyboard,
@@ -27,6 +28,7 @@ import {
   toggleCamera,
   toggleHand,
   toggleMic,
+  toggleRecording,
   toggleScreenShare,
 } from '@/features/room/session/sessionController'
 
@@ -187,6 +189,7 @@ export function ControlBar() {
   const micOn = useCallStore((state) => state.micOn)
   const cameraOn = useCallStore((state) => state.cameraOn)
   const sharing = useCallStore((state) => state.sharing)
+  const recording = useCallStore((state) => state.recording)
   const audioPermission = useCallStore((state) => state.audioPermission)
   const videoPermission = useCallStore((state) => state.videoPermission)
 
@@ -258,6 +261,16 @@ export function ControlBar() {
       onClick: () => setPanel('chat'),
     },
     { key: 'divider-2', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
+    {
+      key: 'record',
+      icon: <Disc3 className="h-[18px] w-[18px]" />,
+      label: recording ? t('Stop recording') : t('Record'),
+      tone: recording ? 'danger' : 'default',
+      danger: recording,
+      active: recording,
+      ariaLabel: recording ? t('Stop recording') : t('Start recording'),
+      onClick: () => toggleRecording(),
+    },
     {
       key: 'devices',
       icon: <Settings className="h-[18px] w-[18px]" />,
@@ -334,7 +347,7 @@ export function ControlBar() {
           ))}
         <span className="mx-1 h-7 w-px bg-line" aria-hidden />
         {items
-          .filter((item) => ['chat'].includes(item.key))
+          .filter((item) => ['chat', 'record'].includes(item.key))
           .map((item) => (
             <DesktopControl key={item.key} item={item} />
           ))}
