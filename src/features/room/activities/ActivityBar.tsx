@@ -38,7 +38,6 @@ import {
   pauseTimer,
   resetTimer,
   resumeTimer,
-  setTaskAssignee,
   setTaskNote,
   startTimer,
   toggleTask,
@@ -182,10 +181,12 @@ export function ActivityBar() {
                 </span>
                 <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{t(KIND_TITLE[kind])}</h3>
                 <span className="rounded-full bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-ink-subtle">{count}</span>
-                <Button size="sm" variant="secondary" className="h-7 px-2" onClick={() => startCreate(kind)}>
-                  <Plus className="h-3.5 w-3.5" />
-                  {t('New')}
-                </Button>
+                {kind !== 'task' ? (
+                  <Button size="sm" variant="secondary" className="h-7 px-2" onClick={() => startCreate(kind)}>
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('New')}
+                  </Button>
+                ) : null}
               </div>
               <div className="max-h-[min(60vh,420px)] space-y-2 overflow-y-auto nx-scroll p-3">
                 {kind === 'timer' ? <TimerCard /> : null}
@@ -312,7 +313,6 @@ function TasksList() {
 }
 
 function TaskRow({ task }: { task: ActivityTask }) {
-  const participants = useRoomSessionStore((state) => state.participants)
   const self = useRoomSessionStore((state) => state.self)
   const { canEdit } = useActivityPermissions()
   const t = useT()
@@ -322,9 +322,6 @@ function TaskRow({ task }: { task: ActivityTask }) {
   const mine = Boolean(self && task.assigneeId === self.id)
   // Only the assignee ticks a task; unassigned tasks fall back to host/moderator/creator.
   const canToggle = task.assigneeId != null ? mine : editable
-  const assigneeName = task.assigneeId
-    ? participants.find((participant) => participant.id === task.assigneeId)?.name ?? t('Unknown')
-    : t('Unassigned')
 
   return (
     <div
@@ -354,32 +351,6 @@ function TaskRow({ task }: { task: ActivityTask }) {
           </p>
           {!noteOpen ? activityNote(task.note) : null}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {mine ? (
-              <Badge variant="accent" className="text-[11px]">
-                <Check className="h-3 w-3" />
-                {t('Yours')}
-              </Badge>
-            ) : null}
-            {editable ? (
-              <select
-                value={task.assigneeId ?? ''}
-                onChange={(event) => setTaskAssignee(task.id, event.target.value || null)}
-                aria-label={t('Assignee')}
-                className="h-7 max-w-[140px] rounded-lg border border-line bg-surface-2 px-2 text-[12px] text-ink-muted transition-colors hover:border-line-strong focus:border-accent focus:outline-none"
-              >
-                <option value="">{t('Unassigned')}</option>
-                {participants.map((participant) => (
-                  <option key={participant.id} value={participant.id}>
-                    {participant.name}
-                    {participant.isSelf ? ` ${t('(You)')}` : ''}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11.5px] text-ink-subtle">
-                {assigneeName}
-              </span>
-            )}
             {editable ? (
               <>
                 <button
