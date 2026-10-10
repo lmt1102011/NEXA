@@ -40,13 +40,6 @@ interface StatsBucket {
 }
 
 /**
- * Events that change room-wide state. Recipients attach the best-known sender
- * participant id to these so the session can refuse actions that did not come
- * from the room's host (or a granted moderator).
- */
-const SENDER_VERIFIED_EVENTS: ReadonlySet<string> = new Set(['settings', 'kick', 'end', 'host-transfer', 'request-resolved'])
-
-/**
  * Serverless WebRTC transport built on Trystero. Peers discover each other
  * over public Nostr relays and exchange data + media directly over
  * RTCPeerConnection. Participant presence/chat state flows through trystero
@@ -316,8 +309,8 @@ export class TrysteroRealtimeService implements RealtimeService {
     switch (event.type) {
       case 'peer-hello': {
         const { participant } = event
+        if (!this.bindPeer(peerId, participant.id)) break
         const next = { ...participant, isSelf: false, peerId }
-        this.rememberPeer(peerId, participant.id)
         this.dispatch({ type: 'peer-hello', participant: next })
         if (this.announced && this.self && participant.id !== this.self.id) {
           this.send('peer-ack', { type: 'peer-ack', participant: this.self })
@@ -326,14 +319,14 @@ export class TrysteroRealtimeService implements RealtimeService {
       }
       case 'peer-ack': {
         const { participant } = event
+        if (!this.bindPeer(peerId, participant.id)) break
         const next = { ...participant, isSelf: false, peerId }
-        this.rememberPeer(peerId, participant.id)
         this.dispatch({ type: 'peer-ack', participant: next })
         break
       }
       case 'heartbeat': {
         const participantId = event.participantId
-        this.rememberPeer(peerId, participantId)
+        if (!this.bindPeer(peerId, participantId)) break
         this.dispatch({
           type: 'heartbeat',
           participantId,
@@ -357,11 +350,21 @@ export class TrysteroRealtimeService implements RealtimeService {
     }
   }
 
-  private rememberPeer(peerId: string, participantId: ID) {
-    const previousPeer = this.peerByParticipant.get(participantId)
-    if (previousPeer && previousPeer !== peerId) this.participantByPeer.delete(previousPeer)
+  /**
+   * Binds a wire peer to a participant id, first-writer-wins. Trystero
+   * authenticates the peer connection, not the participant id a peer claims,
+   * so we refuse to (re)bind an id that is already owned by a different live
+   * peer — otherwise a peer could impersonate the host (whose id is public in
+   * the invite link) and defeat every sender check.
+   */
+  private bindPeer(peerId: string, participantId: ID): boolean {
+    const existingPeer = this.peerByParticipant.get(participantId)
+    if (existingPeer && existingPeer !== peerId) return false
+    const existingId = this.participantByPeer.get(peerId)
+    if (existingId && existingId !== participantId) return false
     this.peerByParticipant.set(participantId, peerId)
     this.participantByPeer.set(peerId, participantId)
+    return true
   }
 
   private forgetPeer(peerId: string) {
@@ -375,7 +378,9 @@ export class TrysteroRealtimeService implements RealtimeService {
   }
 
   private dispatch(event: RoomEvent, senderParticipantId?: ID) {
-    if (senderParticipantId && SENDER_VERIFIED_EVENTS.has(event.type)) {
+    // Attach the participant id bound to the wire peer so the session layer can
+    // trust `senderId` (the id cannot be forged once a peer is bound; see bindPeer).
+    if (senderParticipantId) {
       event = { ...event, senderId: senderParticipantId } as RoomEvent
     }
     for (const listener of this.listeners) listener(event)

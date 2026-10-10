@@ -4,25 +4,26 @@ import type { RoomSettingsPatch } from '@/lib/defaults'
 export type RoomEvent =
   | { type: 'peer-hello'; participant: Participant }
   | { type: 'peer-ack'; participant: Participant }
-  | { type: 'peer-update'; participantId: ID; patch: Partial<Participant> }
+  | { type: 'peer-update'; participantId: ID; patch: Partial<Participant>; senderId?: ID }
   | { type: 'peer-leave'; participantId: ID }
   | { type: 'heartbeat'; participantId: ID; participant: Participant }
-  | { type: 'chat'; message: ChatMessage }
-  | { type: 'pin'; message: ChatMessage | null }
+  | { type: 'chat'; message: ChatMessage; senderId?: ID }
+  | { type: 'pin'; message: ChatMessage | null; senderId?: ID }
   | {
       type: 'activity'
       polls: Poll[]
       tasks: ActivityTask[]
       todos: TodoItem[]
       timer: RoomTimer | null
+      senderId?: ID
     }
-  | { type: 'reaction'; messageId: ID; emoji: string; userId: ID }
+  | { type: 'reaction'; messageId: ID; emoji: string; userId: ID; senderId?: ID }
   | { type: 'request'; request: JoinRequest }
   | { type: 'request-resolved'; requestId: ID; participantId: ID; accepted: boolean; senderId?: ID }
-  | { type: 'settings'; patch: RoomSettingsPatch }
-  | { type: 'kick'; participantId: ID }
-  | { type: 'name-taken'; participantId: ID; name: string }
-  | { type: 'host-transfer'; token: string; to: ID }
+  | { type: 'settings'; patch: RoomSettingsPatch; senderId?: ID }
+  | { type: 'kick'; participantId: ID; senderId?: ID }
+  | { type: 'name-taken'; participantId: ID; name: string; senderId?: ID }
+  | { type: 'host-transfer'; token: string; to: ID; senderId?: ID }
   | { type: 'end'; senderId?: ID }
 
 export type RoomEventListener = (event: RoomEvent) => void

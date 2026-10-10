@@ -381,8 +381,90 @@ function syncSelf() {
   realtime?.updateSelf(next)
 }
 
+/**
+ * A peer-announced participant is only trusted for identity, not privileges:
+ * the host role is derived from the room's host id and any permissions a peer
+ * claims for itself are dropped (the host grants them later via peer-update).
+ */
 function sanitizeParticipant(participant: Participant): Participant {
-  return { ...participant, isSelf: false }
+  const room = store().room
+  const role: Participant['role'] = room && participant.id === room.hostId ? 'host' : 'guest'
+  return { ...participant, isSelf: false, role, permissions: undefined }
+}
+
+/** True when the event was sent by the device that owns the room's host id. */
+function senderIsHost(event: { senderId?: ID }): boolean {
+  const room = store().room
+  return Boolean(room && event.senderId !== undefined && event.senderId === room.hostId)
+}
+
+/** Grants carried by the host: check whether a known sender may moderate/manage. */
+function senderCanModerate(senderId?: ID): boolean {
+  if (!senderId) return false
+  const room = store().room
+  if (room && senderId === room.hostId) return true
+  return Boolean(store().participants.find((p) => p.id === senderId)?.permissions?.canModerate)
+}
+
+function senderCanManage(senderId?: ID): boolean {
+  if (!senderId) return false
+  const room = store().room
+  if (room && senderId === room.hostId) return true
+  return Boolean(store().participants.find((p) => p.id === senderId)?.permissions?.canManageRoom)
+}
+
+/**
+ * Validates an inbound chat payload. Peers may not forge another sender's id or
+ * emit `system` messages, and oversized/malformed fields are dropped so a
+ * malicious peer cannot exhaust memory or impersonate the host in chat.
+ */
+function sanitizeIncomingMessage(
+  message: ChatMessage | null | undefined,
+  senderId?: ID,
+  allowAnyAuthor = false,
+): ChatMessage | null {
+  if (!message || typeof message !== 'object') return null
+  if (!senderId) return null
+  const authorId = typeof message.senderId === 'string' ? message.senderId : senderId
+  if (!allowAnyAuthor && authorId !== senderId) return null
+  if (message.kind === 'system' || authorId === 'system') return null
+  let file: ChatMessage['file']
+  if (message.kind === 'file') {
+    const incoming = message.file
+    if (!incoming || typeof incoming.url !== 'string' || !incoming.url.startsWith('data:')) return null
+    if (incoming.url.length > 3_000_000) return null
+    file = {
+      name: String(incoming.name ?? 'file').slice(0, 200),
+      size: Number.isFinite(incoming.size) ? Number(incoming.size) : 0,
+      type: String(incoming.type ?? 'application/octet-stream').slice(0, 120),
+      url: incoming.url,
+    }
+  }
+  return {
+    id: typeof message.id === 'string' && message.id ? message.id.slice(0, 80) : generateId('msg'),
+    roomId: store().room?.id ?? message.roomId ?? '',
+    senderId: authorId,
+    senderName: typeof message.senderName === 'string' ? message.senderName.slice(0, 60) : '',
+    avatarColor: typeof message.avatarColor === 'string' ? message.avatarColor.slice(0, 40) : '#717689',
+    kind: file ? 'file' : 'text',
+    text: typeof message.text === 'string' ? message.text.slice(0, 2000) : '',
+    file,
+    reactions: {},
+    createdAt: Number.isFinite(message.createdAt) ? Number(message.createdAt) : Date.now(),
+  }
+}
+
+function sanitizeIncomingActivities(
+  event: Extract<RoomEvent, { type: 'activity' }>,
+): { polls: Poll[]; tasks: ActivityTask[]; todos: TodoItem[]; timer: RoomTimer | null } | null {
+  if (!Array.isArray(event.polls) || !Array.isArray(event.tasks) || !Array.isArray(event.todos)) return null
+  if (event.polls.length > 100 || event.tasks.length > 300 || event.todos.length > 800) return null
+  return {
+    polls: event.polls,
+    tasks: event.tasks,
+    todos: event.todos,
+    timer: event.timer ?? null,
+  }
 }
 
 function normalizeName(name: string) {
@@ -475,9 +557,19 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     }
     case 'peer-update': {
+      // A peer may always update *itself* (name/mic/camera). The host may update
+      // anyone, and a granted moderator may drive others' mic/camera — but only
+      // the host may change role/permissions (privilege escalation guard).
+      const fromHost = senderIsHost(event)
+      const selfUpdate = event.senderId !== undefined && event.participantId === event.senderId
+      if (!fromHost && !selfUpdate && !senderCanModerate(event.senderId) && !senderCanManage(event.senderId)) break
+      const patch: Partial<Participant> = { ...event.patch }
+      if (!fromHost) {
+        delete patch.role
+        delete patch.permissions
+      }
       if (event.participantId === selfId) {
         if (!state.self) break
-        const patch = event.patch
         const call = useCallStore.getState()
         if (patch.micOn !== undefined) {
           call.setMic(patch.micOn)
@@ -495,9 +587,9 @@ function handleRealtimeEvent(event: RoomEvent) {
         break
       }
       touchParticipant(event.participantId)
-      state.updateParticipant(event.participantId, { ...event.patch, isSelf: false })
-      if (state.self?.role === 'host' && event.patch.name !== undefined) {
-        const clash = nameTakenBy(event.patch.name, event.participantId)
+      state.updateParticipant(event.participantId, { ...patch, isSelf: false })
+      if (state.self?.role === 'host' && patch.name !== undefined) {
+        const clash = nameTakenBy(patch.name, event.participantId)
         if (clash) flagNameClash(clash, event.participantId)
       }
       break
@@ -508,35 +600,46 @@ function handleRealtimeEvent(event: RoomEvent) {
       state.removeParticipant(event.participantId)
       break
     }
-    case 'chat':
-      state.addMessage(event.message)
+    case 'chat': {
+      const message = sanitizeIncomingMessage(event.message, event.senderId)
+      if (message) state.addMessage(message)
       break
-    case 'pin':
-      state.setPinnedMessage(event.message)
+    }
+    case 'pin': {
+      // Hosts/moderators may pin anyone's message; everyone else only their own.
+      const moderator = senderCanModerate(event.senderId)
+      if (event.message) {
+        const message = sanitizeIncomingMessage(event.message, event.senderId, moderator)
+        if (message) state.setPinnedMessage(message)
+      } else {
+        if (!moderator && state.pinnedMessage?.senderId !== event.senderId) break
+        state.setPinnedMessage(null)
+      }
       break
+    }
     case 'activity': {
+      const activities = sanitizeIncomingActivities(event)
+      if (!activities) break
       const previousTasks = new Map(state.tasks.map((task) => [task.id, task] as const))
       const selfAssigned = selfId
-        ? event.tasks.filter(
+        ? activities.tasks.filter(
             (task) => task.assigneeId === selfId && previousTasks.get(task.id)?.assigneeId !== selfId,
           )
         : []
-      const pollsGrew = event.polls.length > state.polls.length
-      state.setActivities({
-        polls: event.polls,
-        tasks: event.tasks,
-        todos: event.todos,
-        timer: event.timer,
-      })
+      const pollsGrew = activities.polls.length > state.polls.length
+      state.setActivities(activities)
       if (selfAssigned.length > 0) {
         notify({ title: t('New task assigned to you: "{title}"', { title: selfAssigned[0].title }), variant: 'info', duration: 5000 })
       }
       if (selfAssigned.length > 0 || pollsGrew) state.bumpActivitiesUnread()
       break
     }
-    case 'reaction':
+    case 'reaction': {
+      if (!event.senderId || event.userId !== event.senderId) break
+      if (typeof event.emoji !== 'string' || event.emoji.length === 0 || event.emoji.length > 16) break
       state.toggleReaction(event.messageId, event.emoji, event.userId)
       break
+    }
     case 'request': {
       if (!isAuthenticatedHost()) return
       const rosterClash = nameTakenBy(event.request.name, event.request.participantId)
@@ -563,14 +666,15 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'request-resolved': {
       if (event.participantId !== useSessionStore.getState().userId) return
-      // Only the room's host may resolve join requests. When the sender's
-      // identity is known, a spoofed "accepted" from another peer is ignored.
-      if (event.senderId !== undefined && state.room && event.senderId !== state.room.hostId) return
+      // Only the room's host may resolve join requests (fail closed: an unknown
+      // sender is rejected).
+      if (!senderIsHost(event)) return
       if (event.accepted) void approveSelf()
       else state.setStatus('rejected', 'Your request was declined by the host.')
       break
     }
     case 'settings': {
+      if (!senderIsHost(event) && !senderCanManage(event.senderId)) break
       state.applySettingsPatch(event.patch)
       if (event.patch.access?.lockRoom !== undefined) {
         state.addMessage(
@@ -580,6 +684,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     }
     case 'kick': {
+      if (!senderCanModerate(event.senderId)) break
       if (event.participantId === selfId) {
         // Being removed is not a clean leave: the target device must drop its
         // own connection too, otherwise it keeps heartbeating and the host
@@ -595,6 +700,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     }
     case 'name-taken': {
+      if (!senderIsHost(event)) break
       if (event.participantId !== selfId) break
       const self = state.self
       if (!self || normalizeName(self.name) !== normalizeName(event.name)) break
@@ -609,9 +715,8 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     }
     case 'end': {
-      // A room can only be ended by the device holding the host role. When the
-      // sender's identity is known, reject end-commands from anyone else.
-      if (event.senderId !== undefined && state.room && event.senderId !== state.room.hostId) break
+      // A room can only be ended by the device holding the host role.
+      if (!senderIsHost(event)) break
       stopLocalMedia()
       state.setStatus('ended')
       if (activeRoomId) {
@@ -620,6 +725,8 @@ function handleRealtimeEvent(event: RoomEvent) {
       break
     }
     case 'host-transfer': {
+      // The host token is a secret: only accept it from the current host.
+      if (!senderIsHost(event)) break
       if (event.to !== selfId || !activeRoomId) break
       useSessionStore.getState().setHostToken(activeRoomId, event.token)
       break
