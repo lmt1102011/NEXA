@@ -22,6 +22,7 @@ const EVENT_TYPES = [
   'activity',
   'reaction',
   'request',
+  'snapshot',
   'request-resolved',
   'settings',
   'kick',

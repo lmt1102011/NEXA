@@ -61,6 +61,7 @@ let offStream: (() => void) | null = null
 let statsTimer: number | null = null
 let presenceTimer: number | null = null
 let lastSeen = new Map<ID, number>()
+let snapshotSentTo = new Set<ID>()
 let activeRoomId: ID | null = null
 let joinApproved = false
 let requestRetryTimer: number | null = null
@@ -163,6 +164,7 @@ function cleanupTransport() {
   offRemoteStream = null
   stopStatsMonitor()
   videoCap = null
+  snapshotSentTo.clear()
   realtime?.dispose()
   realtime = null
 }
@@ -454,16 +456,19 @@ function sanitizeIncomingMessage(
   }
 }
 
-function sanitizeIncomingActivities(
-  event: Extract<RoomEvent, { type: 'activity' }>,
-): { polls: Poll[]; tasks: ActivityTask[]; todos: TodoItem[]; timer: RoomTimer | null } | null {
-  if (!Array.isArray(event.polls) || !Array.isArray(event.tasks) || !Array.isArray(event.todos)) return null
-  if (event.polls.length > 100 || event.tasks.length > 300 || event.todos.length > 800) return null
+function sanitizeIncomingActivities(input: {
+  polls: Poll[]
+  tasks: ActivityTask[]
+  todos: TodoItem[]
+  timer: RoomTimer | null
+}): { polls: Poll[]; tasks: ActivityTask[]; todos: TodoItem[]; timer: RoomTimer | null } | null {
+  if (!Array.isArray(input.polls) || !Array.isArray(input.tasks) || !Array.isArray(input.todos)) return null
+  if (input.polls.length > 100 || input.tasks.length > 300 || input.todos.length > 800) return null
   return {
-    polls: event.polls,
-    tasks: event.tasks,
-    todos: event.todos,
-    timer: event.timer ?? null,
+    polls: input.polls,
+    tasks: input.tasks,
+    todos: input.todos,
+    timer: input.timer ?? null,
   }
 }
 
@@ -523,6 +528,30 @@ export function renameSelf(name: string): boolean {
   return true
 }
 
+/**
+ * Sends the current room state (chat, pinned message, activities, settings) to
+ * a newly-arrived peer so late joiners/reconnectors see history instead of an
+ * empty room. Only the host serves snapshots so the payload is trusted.
+ */
+function sendSnapshot(participantId: ID) {
+  const state = store()
+  if (!state.room || snapshotSentTo.has(participantId)) return
+  snapshotSentTo.add(participantId)
+  realtime?.sendTarget(
+    {
+      type: 'snapshot',
+      messages: state.messages.slice(-200),
+      pinned: state.pinnedMessage,
+      polls: state.polls,
+      tasks: state.tasks,
+      todos: state.todos,
+      timer: state.timer,
+      settings: state.room.settings,
+    },
+    participantId,
+  )
+}
+
 function handleRealtimeEvent(event: RoomEvent) {
   const state = store()
   const selfId = state.self?.id
@@ -532,6 +561,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       if (event.participant.id === selfId) return
       touchParticipant(event.participant.id)
       state.addParticipant(sanitizeParticipant(event.participant))
+      if (isAuthenticatedHost()) sendSnapshot(event.participant.id)
       if (state.self?.role === 'host') {
         const clash = nameTakenBy(event.participant.name, event.participant.id)
         if (clash) flagNameClash(clash, event.participant.id)
@@ -542,6 +572,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       if (event.participant.id === selfId) return
       touchParticipant(event.participant.id)
       state.addParticipant(sanitizeParticipant(event.participant))
+      if (isAuthenticatedHost()) sendSnapshot(event.participant.id)
       if (state.self?.role === 'host') {
         const clash = nameTakenBy(event.participant.name, event.participant.id)
         if (clash) flagNameClash(clash, event.participant.id)
@@ -598,6 +629,35 @@ function handleRealtimeEvent(event: RoomEvent) {
       if (event.participantId === selfId) return
       lastSeen.delete(event.participantId)
       state.removeParticipant(event.participantId)
+      break
+    }
+    case 'snapshot': {
+      // Room history is only trusted from the host. Apply it once, when we are
+      // still empty, so a late joiner/reconnector isn't left staring at a blank
+      // room (events only travel forward otherwise).
+      if (!senderIsHost(event)) break
+      const incoming = Array.isArray(event.messages) ? event.messages : []
+      if (incoming.length > 0) {
+        const merged = new Map<ID, ChatMessage>()
+        for (const m of incoming) {
+          const clean = sanitizeIncomingMessage(m, m?.senderId, true)
+          if (clean) merged.set(clean.id, clean)
+        }
+        for (const m of state.messages) merged.set(m.id, m)
+        if (merged.size > 0) {
+          const messages = [...merged.values()].sort((a, b) => a.createdAt - b.createdAt).slice(-300)
+          state.setMessages(messages)
+        }
+      }
+      if (!state.pinnedMessage && event.pinned) {
+        const pinned = sanitizeIncomingMessage(event.pinned, event.pinned?.senderId, true)
+        if (pinned) state.setPinnedMessage(pinned)
+      }
+      if (state.polls.length === 0 && state.tasks.length === 0 && state.todos.length === 0 && !state.timer) {
+        const activities = sanitizeIncomingActivities(event)
+        if (activities) state.setActivities(activities)
+      }
+      if (event.settings) state.applySettingsPatch(event.settings)
       break
     }
     case 'chat': {
