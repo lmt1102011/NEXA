@@ -21,6 +21,8 @@ const EVENT_TYPES = [
   'pin',
   'activity',
   'reaction',
+  'hand',
+  'float',
   'request',
   'snapshot',
   'request-resolved',

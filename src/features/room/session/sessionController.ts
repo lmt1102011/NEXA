@@ -847,6 +847,22 @@ function handleRealtimeEvent(event: RoomEvent) {
       state.toggleReaction(event.messageId, event.emoji, event.userId)
       break
     }
+    case 'hand': {
+      if (!event.senderId || event.participantId !== event.senderId) break
+      state.updateParticipant(event.participantId, { handRaised: Boolean(event.raised) })
+      const raiser = store().participants.find((participant) => participant.id === event.participantId)
+      if (event.raised && raiser && !raiser.isSelf) {
+        notify({ title: t('{name} raised their hand', { name: raiser.name }), variant: 'info', duration: 4000 })
+      }
+      break
+    }
+    case 'float': {
+      if (!event.senderId || event.participantId !== event.senderId) break
+      if (typeof event.emoji !== 'string' || event.emoji.length === 0 || event.emoji.length > 16) break
+      const name = typeof event.name === 'string' ? event.name.slice(0, 40) : ''
+      state.pushFloatingReaction(event.emoji, name)
+      break
+    }
     case 'request': {
       if (!isAuthenticatedHost()) return
       // "Block join requests" pauses the waiting room: politely turn the joiner
@@ -1158,6 +1174,30 @@ export function toggleReaction(messageId: ID, emoji: string) {
   }
   state.toggleReaction(messageId, emoji, self.id)
   realtime?.emit({ type: 'reaction', messageId, emoji, userId: self.id })
+}
+
+/**
+ * Raises or lowers the local participant's hand. The raised state is part of
+ * the participant record, so it rides along with heartbeats and self-updates
+ * and stays correct for late joiners.
+ */
+export function toggleHand() {
+  const state = store()
+  const self = state.self
+  if (!self || !state.room) return
+  const raised = !self.handRaised
+  state.updateParticipant(self.id, { handRaised: raised })
+  realtime?.emit({ type: 'hand', participantId: self.id, raised })
+  realtime?.updateSelf({ ...self, handRaised: raised })
+}
+
+/** Broadcasts a short-lived floating reaction to everyone in the room. */
+export function sendFloatingReaction(emoji: string) {
+  const state = store()
+  const self = state.self
+  if (!self || !state.room) return
+  state.pushFloatingReaction(emoji, self.name)
+  realtime?.emit({ type: 'float', emoji, participantId: self.id, name: self.name })
 }
 
 export function pinMessage(message: ChatMessage | null) {

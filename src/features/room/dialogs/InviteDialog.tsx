@@ -1,4 +1,5 @@
 import { Check, Copy, ExternalLink, Link2, QrCode, Share2, Users } from 'lucide-react'
+import QRCode from 'react-qr-code'
 import {
   Dialog,
   DialogBody,
@@ -71,6 +72,25 @@ export function InviteDialog() {
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied ? t('Copied') : t('Copy')}
             </Button>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="rounded-2xl bg-white p-3 ring-1 ring-line"
+              aria-label={t('Scan to join')}
+              role="img"
+            >
+              <QRCode
+                value={link || room.code}
+                size={148}
+                level="M"
+                bgColor="#ffffff"
+                fgColor="#141414"
+              />
+            </div>
+            <p className="text-center text-[11.5px] text-ink-subtle">
+              {t('Scan the code with a phone camera to join.')}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">

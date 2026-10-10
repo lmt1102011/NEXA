@@ -18,6 +18,8 @@ export type RoomEvent =
       senderId?: ID
     }
   | { type: 'reaction'; messageId: ID; emoji: string; userId: ID; senderId?: ID }
+  | { type: 'hand'; participantId: ID; raised: boolean; senderId?: ID }
+  | { type: 'float'; emoji: string; participantId: ID; name: string; senderId?: ID }
   | { type: 'request'; request: JoinRequest }
   | {
       type: 'snapshot'

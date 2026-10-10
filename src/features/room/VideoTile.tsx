@@ -214,6 +214,17 @@ export const VideoTile = memo(function VideoTile({
           {participant.isSelf ? t('{name} (You)', { name: participant.name }) : participant.name}
         </span>
         {participant.role === 'host' ? <Crown className="h-3.5 w-3.5 shrink-0 text-warning" /> : null}
+        {participant.handRaised ? (
+          <motion.span
+            role="img"
+            aria-label={t('Hand raised')}
+            className="shrink-0 text-[13px] leading-none"
+            animate={{ rotate: [0, -18, 12, -8, 0] }}
+            transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 0.6, ease: 'easeInOut' }}
+          >
+            ✋
+          </motion.span>
+        ) : null}
       </div>
 
       {!compact && !participant.isSelf && canModerateSelf && participant.role !== 'host' ? (

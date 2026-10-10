@@ -17,6 +17,13 @@ import { useRoomsStore } from '@/stores/rooms'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 
+export interface FloatingReaction {
+  id: string
+  emoji: string
+  name: string
+  x: number
+}
+
 interface RoomSessionState {
   status: SessionStatus
   statusDetail: string
@@ -34,6 +41,7 @@ interface RoomSessionState {
   activitiesUnread: number
   unread: number
   connected: boolean
+  floatingReactions: FloatingReaction[]
 
   reset: () => void
   bootstrap: (roomId: string) => SessionStatus
@@ -69,6 +77,9 @@ interface RoomSessionState {
   toggleReaction: (messageId: ID, emoji: string, userId: ID) => void
   markRead: () => void
 
+  pushFloatingReaction: (emoji: string, name: string) => void
+  removeFloatingReaction: (id: string) => void
+
   applySettingsPatch: (patch: RoomSettingsPatch) => void
 }
 
@@ -89,6 +100,7 @@ const initialState = {
   activitiesUnread: 0,
   unread: 0,
   connected: false,
+  floatingReactions: [] as FloatingReaction[],
 }
 
 const speakingFlags = new Set<ID>()
@@ -307,6 +319,22 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
 
   markRead: () => set({ unread: 0 }),
 
+  pushFloatingReaction: (emoji, name) =>
+    set((state) => ({
+      floatingReactions: [
+        ...state.floatingReactions,
+        {
+          id: `fl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          emoji,
+          name,
+          x: 12 + Math.random() * 76,
+        },
+      ].slice(-16),
+    })),
+
+  removeFloatingReaction: (id) =>
+    set((state) => ({ floatingReactions: state.floatingReactions.filter((reaction) => reaction.id !== id) })),
+
   applySettingsPatch: (patch) =>
     set((state) => {
       if (!state.room) return state
@@ -352,6 +380,7 @@ export function buildSelfParticipant(input: {
     cameraOn: callDefaults.cameraOn,
     screenSharing: false,
     isSpeaking: false,
+    handRaised: false,
     quality: 'excellent',
     joinedAt: Date.now(),
   }

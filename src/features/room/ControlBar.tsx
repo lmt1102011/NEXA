@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import {
   Camera,
   CameraOff,
   Ellipsis,
+  Hand,
   Keyboard,
   MessageSquare,
   Mic,
@@ -9,8 +11,10 @@ import {
   MonitorUp,
   PhoneOff,
   Settings,
+  SmilePlus,
   UserPlus,
 } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { Kbd } from '@/components/ui/feedback'
@@ -18,7 +22,13 @@ import { useBreakpoint } from '@/hooks'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
-import { toggleCamera, toggleMic, toggleScreenShare } from '@/features/room/session/sessionController'
+import {
+  sendFloatingReaction,
+  toggleCamera,
+  toggleHand,
+  toggleMic,
+  toggleScreenShare,
+} from '@/features/room/session/sessionController'
 
 type Tone = 'default' | 'muted' | 'accent' | 'danger'
 
@@ -120,6 +130,51 @@ function MobileControl({ item }: { item: ControlItem }) {
   )
 }
 
+const FLOATING_EMOJIS = ['👍', '👏', '❤️', '😂', '🎉', '😮', '🔥', '🙌']
+
+function ReactionPicker({ mobile = false }: { mobile?: boolean }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={t('Send a reaction')}
+          className={cn(
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50',
+            mobile
+              ? 'relative flex h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 px-1 text-ink transition-colors active:scale-95'
+              : 'relative inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-surface-2 px-3 text-[13px] font-medium text-ink transition-[background-color,border-color,color] duration-150 hover:border-line-strong hover:bg-surface-3 active:scale-[0.97] xl:px-3.5',
+          )}
+        >
+          <SmilePlus className="h-[18px] w-[18px]" />
+          {mobile ? null : <span className="hidden lg:inline">{t('React')}</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-2">
+        <div className="grid grid-cols-4 gap-1">
+          {FLOATING_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              aria-label={emoji}
+              className="grid h-9 w-9 place-items-center rounded-lg text-xl transition-transform hover:scale-125 hover:bg-surface-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              onClick={() => {
+                sendFloatingReaction(emoji)
+                setOpen(false)
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export function ControlBar() {
   const t = useT()
   const { isMobile } = useBreakpoint()
@@ -182,6 +237,15 @@ export function ControlBar() {
       onClick: () => void toggleScreenShare(),
       disabled: !sharing && !canShare,
     },
+    {
+      key: 'hand',
+      icon: <Hand className="h-[18px] w-[18px]" />,
+      label: self?.handRaised ? t('Lower hand') : t('Raise hand'),
+      tone: self?.handRaised ? 'accent' : 'default',
+      active: Boolean(self?.handRaised),
+      ariaLabel: self?.handRaised ? t('Lower hand') : t('Raise hand'),
+      onClick: () => toggleHand(),
+    },
     { key: 'divider-1', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {
       key: 'chat',
@@ -237,13 +301,14 @@ export function ControlBar() {
   }
 
   if (isMobile) {
-    const mobileKeys = ['mic', 'camera', 'share', 'chat']
+    const mobileKeys = ['mic', 'camera', 'share', 'hand', 'chat']
     const mobileItems = items.filter((item) => mobileKeys.includes(item.key))
     return (
       <div className="relative z-20 flex shrink-0 items-center gap-1 border-t border-line bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur">
         {mobileItems.map((item) => (
           <MobileControl key={item.key} item={item} />
         ))}
+        <ReactionPicker mobile />
         <MobileControl item={moreItem} />
         <MobileControl item={leaveItem} />
       </div>
@@ -263,7 +328,7 @@ export function ControlBar() {
 
       <div className="flex items-center gap-1.5 sm:gap-2">
         {items
-          .filter((item) => ['mic', 'camera', 'share'].includes(item.key))
+          .filter((item) => ['mic', 'camera', 'share', 'hand'].includes(item.key))
           .map((item) => (
             <DesktopControl key={item.key} item={item} />
           ))}
@@ -273,6 +338,7 @@ export function ControlBar() {
           .map((item) => (
             <DesktopControl key={item.key} item={item} />
           ))}
+        <ReactionPicker />
         <span className="mx-1 hidden h-7 w-px bg-line sm:block lg:hidden" aria-hidden />
         <DesktopControl item={moreItem} />
       </div>

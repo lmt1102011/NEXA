@@ -151,6 +151,16 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   'Room code': 'Mã phòng',
   'Copy code': 'Sao chép mã',
   'Share…': 'Chia sẻ…',
+  'Scan to join': 'Quét để tham gia',
+  'Scan the code with a phone camera to join.': 'Quét mã bằng camera điện thoại để tham gia.',
+
+  // ── Hand raise & floating reactions ───────────────────────────
+  'Raise hand': 'Giơ tay',
+  'Lower hand': 'Hạ tay',
+  'Hand raised': 'Đã giơ tay',
+  '{name} raised their hand': '{name} đã giơ tay',
+  'React': 'Thả cảm xúc',
+  'Send a reaction': 'Gửi cảm xúc',
 
   // ── Leave dialog ──────────────────────────────────────────────
   'Who takes over this room?': 'Ai sẽ tiếp quản phòng này?',
