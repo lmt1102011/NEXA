@@ -115,6 +115,19 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Vote {option}': 'Bình chọn {option}',
   'Results': 'Kết quả',
 
+  // ---- host task management ----
+  'Manage tasks': 'Quản lý công việc',
+  'Task management': 'Quản lý công việc',
+  'Assign and lock the work of everyone in the room.': 'Phân công và khóa công việc của mọi người trong phòng.',
+  'Assigned tasks': 'Công việc được giao',
+  'No tasks assigned.': 'Chưa có công việc nào được giao.',
+  'Assignee': 'Người được giao',
+  'No assignee': 'Chưa giao',
+  'Lock task': 'Khóa công việc',
+  'Unlock task': 'Mở khóa công việc',
+  'Locked by the host': 'Bị chủ phòng khóa',
+  'Delete task': 'Xóa công việc',
+
   // ---- per-participant volume ----
   'Volume': 'Âm lượng',
   'Adjust volume for {name}': 'Chỉnh âm lượng cho {name}',

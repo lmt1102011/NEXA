@@ -5,6 +5,7 @@ import {
   Check,
   ClipboardList,
   ListTodo,
+  Lock,
   Plus,
   Trash2,
   X,
@@ -38,7 +39,6 @@ import {
   pauseTimer,
   resetTimer,
   resumeTimer,
-  setTaskNote,
   startTimer,
   toggleTask,
   toggleTodo,
@@ -316,8 +316,6 @@ function TaskRow({ task }: { task: ActivityTask }) {
   const self = useRoomSessionStore((state) => state.self)
   const { canEdit } = useActivityPermissions()
   const t = useT()
-  const [noteOpen, setNoteOpen] = useState(false)
-  const [noteDraft, setNoteDraft] = useState(task.note)
   const editable = canEdit(task.createdBy)
   const mine = Boolean(self && task.assigneeId === self.id)
   // Only the assignee ticks a task; unassigned tasks fall back to host/moderator/creator.
@@ -326,7 +324,7 @@ function TaskRow({ task }: { task: ActivityTask }) {
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border bg-surface p-3',
+        'relative overflow-hidden rounded-xl border bg-surface p-3 pr-9',
         mine ? 'border-accent/50 bg-accent-soft/25' : 'border-line',
       )}
     >
@@ -349,45 +347,30 @@ function TaskRow({ task }: { task: ActivityTask }) {
           <p className={cn('text-[13.5px] leading-snug', task.done ? 'text-ink-subtle line-through' : 'text-ink')}>
             {task.title}
           </p>
-          {!noteOpen ? activityNote(task.note) : null}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {editable ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setNoteOpen((open) => !open)}
-                  className={cn(
-                    'rounded-md px-1.5 py-0.5 text-[11.5px] transition-colors',
-                    noteOpen || task.note ? 'text-accent hover:bg-accent-soft' : 'text-ink-subtle hover:bg-surface-3',
-                  )}
-                >
-                  {task.note ? t('Note ✓') : t('Note')}
-                </button>
-                <button
-                  type="button"
-                  aria-label={t('Delete task')}
-                  onClick={() => deleteTask(task.id)}
-                  className="grid h-6 w-6 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-danger"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </>
-            ) : null}
-          </div>
+          {activityNote(task.note)}
         </div>
       </div>
 
-      {noteOpen && editable ? (
-        <Textarea
-          value={noteDraft}
-          onChange={(event) => setNoteDraft(event.target.value)}
-          onBlur={() => {
-            if (noteDraft !== task.note) setTaskNote(task.id, noteDraft)
-          }}
-          placeholder={t('Add a note…')}
-          className="mt-2 min-h-[60px] text-[13px]"
-        />
-      ) : null}
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        {task.locked ? (
+          <span
+            title={t('Locked by the host')}
+            aria-label={t('Locked by the host')}
+            className="grid h-6 w-6 place-items-center rounded-md text-warning"
+          >
+            <Lock className="h-3.5 w-3.5" />
+          </span>
+        ) : editable ? (
+          <button
+            type="button"
+            aria-label={t('Delete task')}
+            onClick={() => deleteTask(task.id)}
+            className="grid h-6 w-6 place-items-center rounded-md text-ink-subtle transition-colors hover:bg-surface-3 hover:text-danger"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }

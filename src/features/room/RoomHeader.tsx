@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  ClipboardCheck,
   Lock,
   Maximize,
   Minimize,
@@ -16,6 +17,7 @@ import { useRoomSessionStore } from '@/stores/roomSession'
 import { useUiStore } from '@/stores/ui'
 import { ConnectionRadar } from '@/features/room/ConnectionRadar'
 import { ActivityBar } from '@/features/room/activities/ActivityBar'
+import { TaskManagerDialog } from '@/features/room/activities/TaskManagerDialog'
 
 export function RoomHeader() {
   const t = useT()
@@ -27,6 +29,7 @@ export function RoomHeader() {
   const setModal = useUiStore((state) => state.setModal)
 
   const [fullscreen, setFullscreen] = useState(false)
+  const [taskManagerOpen, setTaskManagerOpen] = useState(false)
 
   useEffect(() => {
     const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
@@ -76,6 +79,18 @@ export function RoomHeader() {
         ) : null}
       </div>
 
+      {isHost ? (
+        <button
+          type="button"
+          onClick={() => setTaskManagerOpen(true)}
+          aria-label={t('Manage tasks')}
+          title={t('Manage tasks')}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line bg-surface-2 text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+        >
+          <ClipboardCheck className="h-4 w-4" />
+        </button>
+      ) : null}
+
       <ActivityBar />
 
       <div className="ml-auto flex items-center gap-1.5">
@@ -118,6 +133,10 @@ export function RoomHeader() {
           {t('Invite')}
         </Button>
       </div>
+
+      {isHost ? (
+        <TaskManagerDialog open={taskManagerOpen} onOpenChange={setTaskManagerOpen} />
+      ) : null}
     </header>
   )
 }

@@ -982,11 +982,29 @@ export function setTaskNote(taskId: ID, note: string) {
   patchTask(taskId, { note })
 }
 
+/**
+ * Locks (or unlocks) a task against deletion. Only the host or a moderator may
+ * flip this; while locked, `deleteTask` refuses for everyone.
+ */
+export function setTaskLocked(taskId: ID, locked: boolean) {
+  const state = store()
+  const self = state.self
+  if (!self || !(self.role === 'host' || self.permissions?.canModerate)) return
+  const target = state.tasks.find((task) => task.id === taskId)
+  if (!target) return
+  const activities = {
+    ...currentActivities(),
+    tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, locked } : task)),
+  }
+  state.setActivities(activities)
+  publishActivities(activities)
+}
+
 export function deleteTask(taskId: ID) {
   const state = store()
   const self = state.self
   const target = state.tasks.find((task) => task.id === taskId)
-  if (!self || !target || !canEditActivity(self, target.createdBy)) return
+  if (!self || !target || target.locked || !canEditActivity(self, target.createdBy)) return
   const activities = { ...currentActivities(), tasks: state.tasks.filter((task) => task.id !== taskId) }
   state.setActivities(activities)
   publishActivities(activities)

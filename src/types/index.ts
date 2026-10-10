@@ -167,6 +167,8 @@ export interface ActivityTask {
   done: boolean
   createdBy: ID
   createdAt: number
+  /** When true the host has locked this task against deletion. */
+  locked?: boolean
 }
 
 export interface TodoItem {
