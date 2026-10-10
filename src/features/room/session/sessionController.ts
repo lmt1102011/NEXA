@@ -36,7 +36,18 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024
  * stays listed in a room they are no longer connected to.
  */
 const PRESENCE_INTERVAL_MS = 4000
-const STALE_EVICT_MS = 12000
+/**
+ * A hidden/background tab has its timers throttled by the browser (as slow as
+ * once a minute), so a healthy peer can go quiet for a long stretch. The window
+ * is deliberately generous so we don't kick someone who simply switched tabs;
+ * genuine tab closes still arrive instantly as a peer-level disconnect.
+ */
+const STALE_EVICT_MS = 45000
+/**
+ * How often we probe for a lost connection (all remote peers dropped) before
+ * re-announcing and, ultimately, rebuilding the signaling session.
+ */
+const RECONNECT_INTERVAL_MS = 8000
 
 /**
  * Outbound video bitrate ceiling (kbps) per connection quality. WebRTC keeps
@@ -65,6 +76,11 @@ let snapshotSentTo = new Set<ID>()
 let activeRoomId: ID | null = null
 let joinApproved = false
 let requestRetryTimer: number | null = null
+let reconnectTimer: number | null = null
+let remotePeerSeen = false
+let droppedPeersBySilence = false
+let reconnectAttempts = 0
+let hardReconnects = 0
 
 function notify(input: ToastInput) {
   toast(input)
@@ -122,10 +138,17 @@ export function initRoom(roomId: ID): () => void {
 
   navigator.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange)
   window.addEventListener('pagehide', handlePageHide)
+  window.addEventListener('pageshow', handlePageShow)
+  window.addEventListener('online', handleOnline)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  startReconnectMonitor()
 
   return () => {
     navigator.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange)
     window.removeEventListener('pagehide', handlePageHide)
+    window.removeEventListener('pageshow', handlePageShow)
+    window.removeEventListener('online', handleOnline)
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
     fullTeardown()
   }
 }
@@ -137,11 +160,59 @@ function connectAsSelf() {
   store().setConnected(true)
 }
 
-function handlePageHide() {
+function handlePageHide(event: PageTransitionEvent) {
+  // A bfcache freeze isn't a real departure — keep our seat and just drop the
+  // transport, then rebuild it on pageshow. Counting us out here would leave a
+  // phantom decrement in the persisted room meta.
+  if (event.persisted) {
+    realtime?.disconnect()
+    return
+  }
   const self = store().self
   if (self) realtime?.emit({ type: 'peer-leave', participantId: self.id })
   if (activeRoomId) decParticipantCount(activeRoomId)
   realtime?.disconnect()
+}
+
+/** Broadcasts proof-of-life for ourselves right now. */
+function sendHeartbeat() {
+  const self = store().self
+  if (!self || !realtime) return
+  lastSeen.set(self.id, Date.now())
+  realtime.emit({ type: 'heartbeat', participantId: self.id, participant: self })
+}
+
+/** Treats every peer as freshly seen — used after a pause so no one is evicted. */
+function touchAllPeers() {
+  const now = Date.now()
+  for (const participant of store().participants) {
+    if (!participant.isSelf) lastSeen.set(participant.id, now)
+  }
+}
+
+function handlePageShow(event: PageTransitionEvent) {
+  if (!event.persisted) return
+  reconnectRealtime()
+  sendHeartbeat()
+}
+
+function handleOnline() {
+  if (!activeRoomId) return
+  hardReconnects = 0
+  remotePeerSeen = remotePeerSeen || store().participants.some((participant) => !participant.isSelf)
+  sendHeartbeat()
+  touchAllPeers()
+  realtime?.announce()
+}
+
+function handleVisibilityChange() {
+  // Coming back to a throttled tab: tell peers we're alive and don't hold their
+  // old (throttled) silence against them.
+  if (document.hidden) return
+  if (!store().self || !realtime) return
+  sendHeartbeat()
+  touchAllPeers()
+  realtime?.announce()
 }
 
 /**
@@ -175,6 +246,7 @@ function stopLocalMedia() {
   offStream?.()
   offStream = null
   stopPresenceMonitor()
+  stopReconnectMonitor()
   cleanupTransport()
   mediaEngine.dispose()
   useCallStore.getState().reset()
@@ -285,18 +357,89 @@ function evictSilentPeers() {
     lastSeen.delete(participant.id)
     if (participant.peerId) realtime?.forcePeerLeave(participant.id)
     state.removeParticipant(participant.id)
+    droppedPeersBySilence = true
   }
+}
+
+function noteRemotePresence() {
+  const remote = store().participants.some((participant) => !participant.isSelf)
+  if (!remote) return
+  remotePeerSeen = true
+  droppedPeersBySilence = false
+  reconnectAttempts = 0
+  hardReconnects = 0
+  if (!store().connected) store().setConnected(true)
+}
+
+/**
+ * Tears the signaling session down and rebuilds it in place, keeping our
+ * participant identity. Used when we've lost everyone without a graceful leave
+ * (relay/ICE death), so the call can heal instead of sitting on "Reconnecting…"
+ * forever.
+ */
+function reconnectRealtime() {
+  const self = store().self
+  if (!realtime || !self || !activeRoomId || !joinApproved) return
+  realtime.disconnect()
+  realtime.connect(activeRoomId, self)
+  realtime.announce()
+  pushOutgoingStream()
+  snapshotSentTo.clear()
+  store().setConnected(true)
+  touchAllPeers()
+}
+
+function maybeReconnect() {
+  if (!joinApproved || document.hidden || !store().self) return
+  if (!remotePeerSeen) return
+
+  const remoteCount = store().participants.filter((participant) => !participant.isSelf).length
+  if (remoteCount > 0) {
+    reconnectAttempts = 0
+    return
+  }
+  // Everyone vanished by going silent (network/relay drop) rather than leaving
+  // gracefully — treat it as a dropped connection and try to come back.
+  if (!droppedPeersBySilence) return
+  if (hardReconnects >= 3) {
+    // Given up: stop flashing "Reconnecting…" and let an 'online' event retry.
+    store().setConnected(true)
+    return
+  }
+  store().setConnected(false)
+  reconnectAttempts++
+  if (reconnectAttempts >= 3) {
+    hardReconnects++
+    reconnectAttempts = 0
+    reconnectRealtime()
+  } else {
+    realtime?.announce()
+  }
+}
+
+function startReconnectMonitor() {
+  if (reconnectTimer !== null) return
+  reconnectTimer = window.setInterval(maybeReconnect, RECONNECT_INTERVAL_MS)
+}
+
+function stopReconnectMonitor() {
+  if (reconnectTimer !== null) window.clearInterval(reconnectTimer)
+  reconnectTimer = null
+  remotePeerSeen = false
+  droppedPeersBySilence = false
+  reconnectAttempts = 0
+  hardReconnects = 0
 }
 
 function startPresenceMonitor() {
   if (presenceTimer !== null) return
   const tick = () => {
-    const self = store().self
-    if (self && realtime) {
-      lastSeen.set(self.id, Date.now())
-      realtime.emit({ type: 'heartbeat', participantId: self.id, participant: self })
-    }
-    evictSilentPeers()
+    sendHeartbeat()
+    // Don't evict on stale clocks while we're backgrounded: the browser throttles
+    // our timers there, so our view of everyone's liveness goes stale and we'd
+    // drop perfectly healthy peers.
+    if (!document.hidden) evictSilentPeers()
+    noteRemotePresence()
   }
   tick()
   presenceTimer = window.setInterval(tick, PRESENCE_INTERVAL_MS)
