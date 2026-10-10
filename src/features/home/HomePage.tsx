@@ -80,6 +80,14 @@ export default function HomePage() {
             <motion.p
               variants={heroMotion}
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-ink-subtle"
+            >
+              Made By LMT
+            </motion.p>
+
+            <motion.p
+              variants={heroMotion}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="mt-4 text-xl font-medium text-ink sm:text-2xl"
             >
               {t('Talk. Share. Connect.')}
