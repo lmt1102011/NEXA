@@ -172,6 +172,32 @@ export class TrysteroRealtimeService implements RealtimeService {
     }
   }
 
+  /**
+   * Caps the outbound microphone bitrate on every live peer connection. Unlike
+   * video this is set once per room setting change; audio has no adaptive
+   * controller. Passing `null` restores the (high) default ceiling.
+   */
+  setAudioMaxBitrate(kbps: number | null) {
+    if (!this.room) return
+    for (const pc of Object.values(this.room.getPeers())) {
+      for (const sender of pc.getSenders()) {
+        if (sender.track?.kind !== 'audio' || sender.track.muted) continue
+        const params = sender.getParameters()
+        const encodings = params.encodings?.map((enc) => ({
+          ...enc,
+          maxBitrate: kbps === null ? 510_000 : kbps * 1000,
+        }))
+        if (!encodings) continue
+        const next: RTCRtpSendParameters = { ...params, encodings }
+        try {
+          void sender.setParameters(next).catch(() => undefined)
+        } catch {
+          // parameters may be mid-negotiation; the next change re-applies
+        }
+      }
+    }
+  }
+
   async measureStats(): Promise<StatsSample | null> {
     if (!this.room) return null
     const peerIds = Object.keys(this.room.getPeers())

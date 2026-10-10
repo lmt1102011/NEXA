@@ -1,4 +1,4 @@
-import type { DeviceOption } from '@/types'
+import type { AudioQuality, DeviceOption, VideoQuality } from '@/types'
 import type { PermissionStatus } from '@/stores/call'
 
 export interface PrepareResult {
@@ -10,6 +10,23 @@ export interface MediaConstraintsPrefs {
   echoCancellation: boolean
   noiseSuppression: boolean
   autoGainControl: boolean
+  videoQuality: VideoQuality
+  audioQuality: AudioQuality
+}
+
+const VIDEO_DIMENSIONS: Record<VideoQuality, { width: number; height: number }> = {
+  auto: { width: 1280, height: 720 },
+  '1080p': { width: 1920, height: 1080 },
+  '720p': { width: 1280, height: 720 },
+  '360p': { width: 640, height: 360 },
+  '180p': { width: 320, height: 180 },
+}
+
+const AUDIO_SAMPLE_RATE: Record<AudioQuality, number> = {
+  auto: 48000,
+  high: 48000,
+  medium: 24000,
+  low: 16000,
 }
 
 type StreamListener = () => void
@@ -40,6 +57,8 @@ export class MediaEngine {
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
+    videoQuality: 'auto',
+    audioQuality: 'auto',
   }
   private prefsLocked = false
   private preferredAudioId = ''
@@ -72,6 +91,7 @@ export class MediaEngine {
           echoCancellation: this.prefs.echoCancellation,
           noiseSuppression: this.prefs.noiseSuppression,
           autoGainControl: this.prefs.autoGainControl,
+          sampleRate: AUDIO_SAMPLE_RATE[this.prefs.audioQuality],
           ...(this.preferredAudioId ? { deviceId: { exact: this.preferredAudioId } } : {}),
         },
         video: false,
@@ -85,12 +105,13 @@ export class MediaEngine {
 
   private async startVideo(): Promise<PermissionStatus> {
     if (this.hasVideoTrack()) return 'granted'
+    const dimensions = VIDEO_DIMENSIONS[this.prefs.videoQuality]
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          width: { ideal: 1280, max: 1600 },
-          height: { ideal: 720, max: 900 },
+          width: { ideal: dimensions.width, max: dimensions.width },
+          height: { ideal: dimensions.height, max: dimensions.height },
           frameRate: { ideal: 30, max: 30 },
           facingMode: 'user',
           ...(this.preferredVideoId ? { deviceId: { exact: this.preferredVideoId } } : {}),
@@ -147,6 +168,21 @@ export class MediaEngine {
     if (lock) this.prefsLocked = true
   }
 
+  /** Applies the current video quality to an already-live camera track. */
+  async applyVideoQuality(): Promise<void> {
+    const dimensions = VIDEO_DIMENSIONS[this.prefs.videoQuality]
+    for (const track of this.stream?.getVideoTracks() ?? []) {
+      try {
+        await track.applyConstraints({
+          width: { ideal: dimensions.width, max: dimensions.width },
+          height: { ideal: dimensions.height, max: dimensions.height },
+        })
+      } catch {
+        // The camera may refuse the smaller size; keep the current track.
+      }
+    }
+  }
+
   isPrefsLocked() {
     return this.prefsLocked
   }
@@ -159,9 +195,9 @@ export class MediaEngine {
           echoCancellation: this.prefs.echoCancellation,
           noiseSuppression: this.prefs.noiseSuppression,
           autoGainControl: this.prefs.autoGainControl,
+          sampleRate: AUDIO_SAMPLE_RATE[this.prefs.audioQuality],
           ...(this.preferredAudioId ? { deviceId: { exact: this.preferredAudioId } } : {}),
         },
-        video: false,
       })
       const wasEnabled = this.stream?.getAudioTracks()[0]?.enabled ?? true
       this.removeTracks('audio')

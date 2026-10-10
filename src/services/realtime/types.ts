@@ -60,6 +60,7 @@ export interface RealtimeService {
   updateSelf: (self: Participant) => void
   sendStream: (stream: MediaStream | null) => void
   setVideoMaxBitrate: (kbps: number | null) => void
+  setAudioMaxBitrate: (kbps: number | null) => void
   measureStats: () => Promise<StatsSample | null>
   disconnect: () => void
   forcePeerLeave: (participantId: ID) => void

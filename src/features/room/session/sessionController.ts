@@ -1,5 +1,6 @@
 import type {
   ActivityTask,
+  AudioQuality,
   ChatMessage,
   ID,
   JoinRequest,
@@ -10,6 +11,7 @@ import type {
   RoomTimer,
   ToastInput,
   TodoItem,
+  VideoQuality,
 } from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 import type { RoomEvent, RealtimeService } from '@/services/realtime'
@@ -61,6 +63,25 @@ const VIDEO_CAP_KBPS: Record<'poor' | 'fair' | 'good' | 'excellent', number | nu
   excellent: null,
 }
 const LOW_BANDWIDTH_CAP_KBPS = 240
+
+/**
+ * Room-level outbound ceilings chosen in room settings. They act as a hard
+ * cap on top of the connection-driven cap so a host can pin the call to a
+ * resolution/bandwidth budget. `null` means "no room cap".
+ */
+const VIDEO_QUALITY_CAP_KBPS: Record<VideoQuality, number | null> = {
+  auto: null,
+  '1080p': 4000,
+  '720p': 2000,
+  '360p': 700,
+  '180p': 250,
+}
+const AUDIO_QUALITY_CAP_KBPS: Record<AudioQuality, number | null> = {
+  auto: null,
+  high: null,
+  medium: 64,
+  low: 32,
+}
 
 let videoCap: number | null = null
 
@@ -314,9 +335,47 @@ function adaptVideoCap() {
     next = Math.min(base, Math.round(current * 1.35))
   }
 
-  if (next === current) return
   videoCap = next
-  realtime?.setVideoMaxBitrate(videoCap)
+  // Re-apply even when unchanged so peers that joined since the last tick also
+  // receive the current ceiling.
+  applyVideoBitrate()
+}
+
+/** Outbound video ceiling: the connection-driven cap clamped by the room setting. */
+function applyVideoBitrate() {
+  if (!realtime) return
+  const roomCap = VIDEO_QUALITY_CAP_KBPS[store().room?.settings.av.videoQuality ?? 'auto']
+  const effective = roomCap === null ? videoCap : videoCap === null ? roomCap : Math.min(videoCap, roomCap)
+  realtime.setVideoMaxBitrate(effective)
+}
+
+/** Pushes the room's audio/video quality ceilings to the live peer connections. */
+function applyRoomQualityCaps() {
+  if (!realtime) return
+  realtime.setAudioMaxBitrate(AUDIO_QUALITY_CAP_KBPS[store().room?.settings.av.audioQuality ?? 'auto'])
+  applyVideoBitrate()
+}
+
+/**
+ * Re-applies room audio/video settings when the host changes them mid-call:
+ * capture resolution, audio sample rate and the outbound bitrate ceilings.
+ * A locally-locked audio preference (set in Device settings) is left untouched.
+ */
+function applyRoomAvSettings() {
+  const av = store().room?.settings.av
+  if (!av) return
+  if (!mediaEngine.isPrefsLocked()) {
+    mediaEngine.setPreferences({
+      echoCancellation: av.echoCancellation,
+      noiseSuppression: av.noiseFilter !== 'off',
+      autoGainControl: av.noiseFilter !== 'off',
+      videoQuality: av.videoQuality,
+      audioQuality: av.audioQuality,
+    })
+    void mediaEngine.applyVideoQuality()
+    void mediaEngine.reapplyAudio()
+  }
+  applyRoomQualityCaps()
 }
 
 function startStatsMonitor() {
@@ -466,11 +525,14 @@ async function refreshDevices() {
 async function prepareMedia(audio: boolean, camera: boolean, silent: boolean) {
   const call = useCallStore.getState()
   if (!mediaEngine.isPrefsLocked()) {
-    const noiseFilter = store().room?.settings.av.noiseFilter ?? 'light'
+    const av = store().room?.settings.av
+    const noiseFilter = av?.noiseFilter ?? 'light'
     mediaEngine.setPreferences({
-      echoCancellation: store().room?.settings.av.echoCancellation ?? true,
+      echoCancellation: av?.echoCancellation ?? true,
       noiseSuppression: noiseFilter !== 'off',
       autoGainControl: noiseFilter !== 'off',
+      videoQuality: av?.videoQuality ?? 'auto',
+      audioQuality: av?.audioQuality ?? 'auto',
     })
   }
 
@@ -803,7 +865,10 @@ function handleRealtimeEvent(event: RoomEvent) {
         const activities = sanitizeIncomingActivities(event)
         if (activities) state.setActivities(activities)
       }
-      if (event.settings) state.applySettingsPatch(event.settings)
+      if (event.settings) {
+        state.applySettingsPatch(event.settings)
+        if (event.settings.av) applyRoomAvSettings()
+      }
       break
     }
     case 'chat': {
@@ -910,6 +975,7 @@ function handleRealtimeEvent(event: RoomEvent) {
     case 'settings': {
       if (!senderIsHost(event) && !senderCanManage(event.senderId)) break
       state.applySettingsPatch(event.patch)
+      if (event.patch.av) applyRoomAvSettings()
       if (event.patch.security) scheduleAutoExpire()
       if (event.patch.access?.lockRoom !== undefined) {
         state.addMessage(
@@ -1056,6 +1122,7 @@ async function approveSelf() {
   startPresenceMonitor()
   await refreshDevices()
   pushOutgoingStream()
+  applyRoomQualityCaps()
 }
 
 export function acceptRequest(requestId: ID) {
@@ -1583,11 +1650,14 @@ export async function switchDevice(kind: 'audio' | 'video', deviceId: string) {
 }
 
 export function applyLocalAudioPreferences(prefs: { noiseFilter: NoiseFilter; echoCancellation: boolean }) {
+  const av = store().room?.settings.av
   mediaEngine.setPreferences(
     {
       echoCancellation: prefs.echoCancellation,
       noiseSuppression: prefs.noiseFilter !== 'off',
       autoGainControl: prefs.noiseFilter !== 'off',
+      videoQuality: av?.videoQuality ?? 'auto',
+      audioQuality: av?.audioQuality ?? 'auto',
     },
     true,
   )
@@ -1609,6 +1679,7 @@ export function applyHostSettings(patch: RoomSettingsPatch) {
   if (!self || (!isAuthenticatedHost() && !self.permissions?.canManageRoom)) return
   state.applySettingsPatch(patch)
   realtime?.emit({ type: 'settings', patch })
+  if (patch.av) applyRoomAvSettings()
   if (patch.security) scheduleAutoExpire()
 }
 
