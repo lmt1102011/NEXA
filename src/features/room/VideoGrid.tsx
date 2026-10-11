@@ -4,6 +4,7 @@ import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { useBreakpoint, useMediaQuery } from '@/hooks'
 import { Avatar } from '@/components/ui/avatar'
+import { useUiStore } from '@/stores/ui'
 import { VideoTile } from '@/features/room/VideoTile'
 import type { Participant } from '@/types'
 
@@ -39,6 +40,7 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
   const { isMobile, isDesktop } = useBreakpoint()
   const landscape = useMediaQuery('(orientation: landscape)')
   const [expanded, setExpanded] = useState(false)
+  const view = useUiStore((state) => state.view)
 
   const ordered = useMemo(() => {
     const self = participants.filter((participant) => participant.isSelf)
@@ -62,6 +64,10 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
     gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`,
     gridTemplateRows: `repeat(${layout.rows}, minmax(0, 1fr))`,
     gap: isDesktop ? 12 : 8,
+  }
+
+  if (view === 'speaker') {
+    return <SpeakerLayout participants={ordered} />
   }
 
   return (
@@ -99,6 +105,60 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
 
       {expanded ? (
         <ParticipantsOverlay participants={ordered} onClose={() => setExpanded(false)} />
+      ) : null}
+    </div>
+  )
+}
+
+function SpeakerLayout({ participants }: { participants: Participant[] }) {
+  const t = useT()
+  const [manual, setManual] = useState<Participant | null>(null)
+
+  const active = useMemo(() => {
+    if (manual) return manual
+    const speaking = participants
+      .filter((participant) => !participant.isSelf)
+      .sort((a, b) => (b.lastSpeakedAt ?? 0) - (a.lastSpeakedAt ?? 0))[0]
+    return speaking ?? participants[0]
+  }, [manual, participants])
+
+  if (!active) {
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-center text-[13px] text-ink-subtle">
+        {t('No one is here yet')}
+      </div>
+    )
+  }
+
+  const others = participants.filter((participant) => participant.id !== active.id)
+  const isHandRaised = active.handRaised
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2 p-2 sm:gap-3 sm:p-3">
+      <div className="relative min-h-0 flex-1">
+        <VideoTile participant={active} index={0} className="h-full" />
+        {isHandRaised ? (
+          <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-warning px-3 py-1 text-[12px] font-medium text-ink-inverted shadow">
+            {t('Hand raised')}
+          </div>
+        ) : null}
+      </div>
+      {others.length > 0 ? (
+        <div className="flex h-[84px] shrink-0 gap-2 overflow-x-auto nx-scroll sm:h-[120px] sm:gap-3">
+          {others.map((participant) => (
+            <button
+              key={participant.id}
+              type="button"
+              onClick={() => setManual(participant)}
+              className={cn(
+                'h-full w-[128px] shrink-0 sm:w-[180px]',
+                participant.id === active.id ? 'opacity-40' : '',
+              )}
+            >
+              <VideoTile participant={participant} compact className="h-full" />
+            </button>
+          ))}
+        </div>
       ) : null}
     </div>
   )

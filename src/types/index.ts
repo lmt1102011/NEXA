@@ -97,6 +97,7 @@ export interface Participant {
   cameraOn: boolean
   screenSharing: boolean
   isSpeaking: boolean
+  lastSpeakedAt?: number
   handRaised?: boolean
   handRaisedAt?: number
   quality: ConnectionQuality

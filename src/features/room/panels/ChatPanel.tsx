@@ -36,6 +36,13 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const EMOJIS = [
+  '😀','😄','😁','🤣','😂','🙂','😉','😊','😍','😘','😜','🤪','🤔','🤨','😐',
+  '😴','😷','🤯','😎','🥳','😢','😭','😤','😡','🥺','😳','🙃','😇','🤗','🤭',
+  '👍','👎','👏','🙌','🙏','💪','🤝','✌️','🤞','👋','🫶','❤️','🔥','✨','🎉',
+  '💯','⚡','☕','🍕','🚀','💡','✅','❌','❓','❗','💤','🫡','🤷','👀','🧠','🎯',
+]
+
 /**
  * Renders message text with `@Name` tokens highlighted. Names are matched
  * literally (longest first) so multi-word display names work, and the reader's
@@ -82,6 +89,7 @@ export function ChatPanel() {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null)
   const [mentionIndex, setMentionIndex] = useState(0)
+  const [emojiOpen, setEmojiOpen] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -134,6 +142,19 @@ export function ChatPanel() {
     const active = /(?:^|\s)@([\p{L}\p{N}._'-]*)$/u.exec(value)
     setMention(active ? { query: active[1].toLowerCase(), start: value.length - active[1].length - 1 } : null)
     setMentionIndex(0)
+  }
+
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current
+    const start = el?.selectionStart ?? draft.length
+    const end = el?.selectionEnd ?? draft.length
+    const next = draft.slice(0, start) + emoji + draft.slice(end)
+    setDraft(next)
+    requestAnimationFrame(() => {
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(start + emoji.length, start + emoji.length)
+    })
   }
 
   useEffect(() => {
@@ -304,6 +325,34 @@ export function ChatPanel() {
               </button>
             </>
           ) : null}
+
+          <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={t('Emoji')}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
+              >
+                <SmilePlus className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[300px] rounded-xl p-2 shadow-xl">
+              <div className="grid max-h-[240px] grid-cols-8 gap-0.5 overflow-y-auto">
+                {EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      insertEmoji(emoji)
+                    }}
+                    className="grid h-8 w-8 place-items-center rounded-md text-[18px] transition-colors hover:bg-surface-3"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <textarea
             ref={textareaRef}

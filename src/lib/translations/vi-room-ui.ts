@@ -256,4 +256,13 @@ export const roomUiVi: Record<string, TranslationEntry> = {
   'Open chat to reply.': 'Mở trò chuyện để trả lời.',
   'Sending “{name}”…': 'Đang gửi “{name}”…',
   'Maximum file size is 16 MB in peer-to-peer chat.': 'Kích thước tệp tối đa là 16 MB trong trò chuyện ngang hàng.',
+
+  // ── Emoji picker & chat notifications ───────────────────────
+  Emoji: 'Biểu cảm',
+  'Enable message notifications': 'Bật thông báo tin nhắn',
+  'Disable message notifications': 'Tắt thông báo tin nhắn',
+
+  // ── View modes ─────────────────────────────────────────────
+  'Speaker view': 'Xem người nói',
+  'Grid view': 'Xem dạng lưới',
 }

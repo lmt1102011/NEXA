@@ -1,4 +1,4 @@
-import type { ActivityTask, ChatMessage, ID, JoinRequest, Participant, Poll, RoomSettings, RoomTimer, TodoItem } from '@/types'
+import type { ActivityTask, ChatMessage, ConnectionQuality, ID, JoinRequest, Participant, Poll, RoomSettings, RoomTimer, TodoItem } from '@/types'
 import type { RoomSettingsPatch } from '@/lib/defaults'
 
 export type RoomEvent =
@@ -65,6 +65,7 @@ export interface RealtimeService {
   setVideoMaxBitrate: (kbps: number | null) => void
   setAudioMaxBitrate: (kbps: number | null) => void
   measureStats: () => Promise<StatsSample | null>
+  getPeerQuality: () => Map<string, ConnectionQuality>
   disconnect: () => void
   forcePeerLeave: (participantId: ID) => void
   emit: (event: RoomEvent) => void

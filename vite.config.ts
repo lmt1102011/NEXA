@@ -1,14 +1,54 @@
 import { fileURLToPath } from 'node:url'
+import { execSync } from 'node:child_process'
 import path from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
+/** Short git commit of the current tree, or an empty string outside a repo. */
+function gitCommit(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: rootDir, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return 'nogit'
+  }
+}
+
+/** Build version, e.g. `1.0.0+3e74266-20261011134931`. */
+function buildVersion(): string {
+  const stamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14)
+  return `1.0.0+${gitCommit()}-${stamp}`
+}
+
+/**
+ * Bakes the build version into the bundle (`__APP_VERSION__`) and into
+ * `index.html` as a meta tag, so a running client can poll `index.html` and
+ * detect when a newer build has been deployed.
+ */
+function versionPlugin(version: string): Plugin {
+  return {
+    name: 'nexa-version',
+    transformIndexHtml(html) {
+      return html.replace(
+        '</head>',
+        `  <meta name="app-version" content="${version}" />\n  </head>`,
+      )
+    },
+  }
+}
+
+const version = buildVersion()
+
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), versionPlugin(version)],
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
   resolve: {
     alias: {
       '@': path.resolve(rootDir, 'src'),

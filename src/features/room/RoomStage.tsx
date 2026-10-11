@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { MonitorUp, UserPlus, Users } from 'lucide-react'
+import { LayoutGrid, MonitorUp, PictureInPicture2, UserPlus, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { Avatar } from '@/components/ui/avatar'
@@ -13,6 +13,7 @@ import { acceptRequest, rejectRequest } from '@/features/room/session/sessionCon
 import { VideoGrid } from '@/features/room/VideoGrid'
 import { VideoTile } from '@/features/room/VideoTile'
 import { FloatingReactions } from '@/features/room/FloatingReactions'
+import { togglePictureInPicture } from '@/lib/pip'
 import type { Participant } from '@/types'
 
 export default function RoomStage() {
@@ -20,6 +21,9 @@ export default function RoomStage() {
   const sharing = useCallStore((state) => state.sharing)
   const remoteStreams = useCallStore((state) => state.remoteStreams)
   const background = useRoomSessionStore((state) => state.room?.settings.appearance.background ?? 'default')
+  const view = useUiStore((state) => state.view)
+  const setView = useUiStore((state) => state.setView)
+  const t = useT()
 
   const presenter = useMemo(() => {
     const activeRemote = participants.find(
@@ -76,6 +80,28 @@ export default function RoomStage() {
       {presenter ? <SharingLayout presenter={presenter} participants={participants} /> : <VideoGrid participants={participants} />}
       <FloatingReactions />
       <JoinRequestBanner />
+      <div className="pointer-events-auto absolute right-3 top-3 z-20 flex gap-1.5">
+        <button
+          type="button"
+          onClick={() => void togglePictureInPicture()}
+          aria-label={t('Picture in picture')}
+          title={t('Picture in picture')}
+          className="grid h-9 w-9 place-items-center rounded-lg bg-black/50 text-white/90 backdrop-blur transition-colors hover:bg-black/70 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <PictureInPicture2 className="h-4.5 w-4.5" />
+        </button>
+        {!presenter ? (
+          <button
+            type="button"
+            onClick={() => setView(view === 'grid' ? 'speaker' : 'grid')}
+            aria-label={view === 'grid' ? t('Speaker view') : t('Grid view')}
+            title={view === 'grid' ? t('Speaker view') : t('Grid view')}
+            className="grid h-9 w-9 place-items-center rounded-lg bg-black/50 text-white/90 backdrop-blur transition-colors hover:bg-black/70 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {view === 'grid' ? <Users className="h-4.5 w-4.5" /> : <LayoutGrid className="h-4.5 w-4.5" />}
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }

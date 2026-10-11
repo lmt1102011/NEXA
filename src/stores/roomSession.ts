@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   ActivityTask,
   ChatMessage,
+  ConnectionQuality,
   ID,
   JoinRequest,
   Participant,
@@ -61,6 +62,7 @@ interface RoomSessionState {
   addParticipant: (participant: Participant) => void
   removeParticipant: (id: ID) => void
   updateParticipant: (id: ID, patch: Partial<Participant>) => void
+  applyQuality: (quality: Map<ID, ConnectionQuality>) => void
   setParticipants: (participants: Participant[]) => void
   flagSpeaking: (id: ID, on: boolean) => void
 
@@ -242,6 +244,18 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
       self: state.self?.id === id ? { ...state.self, ...patch } : state.self,
     })),
 
+  applyQuality: (quality) =>
+    set((state) => {
+      let changed = false
+      const participants = state.participants.map((p) => {
+        const next = quality.get(p.id)
+        if (next === undefined || next === p.quality) return p
+        changed = true
+        return { ...p, quality: next }
+      })
+      return changed ? { participants } : {}
+    }),
+
   setParticipants: (participants) => set({ participants }),
 
   flagSpeaking: (id, on) => {
@@ -249,13 +263,22 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
     else speakingFlags.delete(id)
     const ids = [...speakingFlags]
     set((state) => ({
-      participants: state.participants.map((p) =>
-        p.isSpeaking === ids.includes(p.id) ? p : { ...p, isSpeaking: ids.includes(p.id) },
-      ),
+      participants: state.participants.map((p) => {
+        if (p.isSpeaking === ids.includes(p.id)) return p
+        return {
+          ...p,
+          isSpeaking: ids.includes(p.id),
+          lastSpeakedAt: ids.includes(p.id) ? Date.now() : p.lastSpeakedAt,
+        }
+      }),
       self: state.self
         ? state.self.isSpeaking === ids.includes(state.self.id)
           ? state.self
-          : { ...state.self, isSpeaking: ids.includes(state.self.id) }
+          : {
+              ...state.self,
+              isSpeaking: ids.includes(state.self.id),
+              lastSpeakedAt: ids.includes(state.self.id) ? Date.now() : state.self.lastSpeakedAt,
+            }
         : state.self,
     }))
   },

@@ -336,7 +336,7 @@ export class MediaEngine {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
-        audio: false,
+        audio: true,
       })
       this.screenStream = stream
       const [track] = stream.getVideoTracks()

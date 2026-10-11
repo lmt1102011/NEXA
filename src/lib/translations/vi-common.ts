@@ -150,8 +150,18 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Got it': 'Đã rõ',
 
   // ---- chat: copy / pin ----
-  'Copy': 'Sao chép',
-  'Copied': 'Đã sao chép',
-  'Pin': 'Ghim',
-  'Unpin': 'Bỏ ghim',
+  Copy: 'Sao chép',
+  Copied: 'Đã sao chép',
+  Pin: 'Ghim',
+  Unpin: 'Bỏ ghim',
+
+  // ---- picture in picture ----
+  'Picture in picture': 'Hình trong hình',
+
+  // ---- chat notifications ----
+  'Sent a file': 'Đã gửi một tệp',
+
+  // ---- build update ----
+  'A new version is available': 'Đã có phiên bản mới',
+  Reload: 'Tải lại',
 }

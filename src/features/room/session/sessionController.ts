@@ -2,6 +2,7 @@ import type {
   ActivityTask,
   AudioQuality,
   ChatMessage,
+  ConnectionQuality,
   ID,
   JoinRequest,
   NoiseFilter,
@@ -26,7 +27,7 @@ import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore, buildSelfParticipant } from '@/stores/roomSession'
 import { useRoomsStore } from '@/stores/rooms'
 import { useSessionStore } from '@/stores/session'
-import { toast } from '@/stores/ui'
+import { toast, useUiStore } from '@/stores/ui'
 
 const STATS_INTERVAL_MS = 3000
 const MAX_FILE_SIZE = 16 * 1024 * 1024
@@ -391,6 +392,25 @@ function applyRoomAvSettings() {
   applyRoomQualityCaps()
 }
 
+/**
+ * Shows a system notification for an incoming chat message when the user has
+ * enabled message notifications and the tab is backgrounded (or the chat panel
+ * is closed), so they don't miss activity while doing something else.
+ */
+function maybeNotifyNewMessage(message: { senderName: string; text?: string; kind: string }) {
+  const ui = useUiStore.getState()
+  if (!ui.chatNotifications) return
+  if (ui.panel === 'chat') return
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  if (!document.hidden) return
+  const body = message.kind === 'file' ? t('Sent a file') : (message.text ?? '')
+  try {
+    new Notification(message.senderName, { body: body.slice(0, 120), tag: 'nexa-chat' })
+  } catch {
+    // notifications can be blocked by the OS; ignore
+  }
+}
+
 function startStatsMonitor() {
   if (statsTimer !== null) return
   statsTimer = window.setInterval(() => {
@@ -401,6 +421,7 @@ function startStatsMonitor() {
           qualityController.report(sample)
           adaptVideoCap()
         }
+        applyPeerQuality()
       } catch {
         // measurement is best-effort
       }
@@ -411,6 +432,23 @@ function startStatsMonitor() {
 function stopStatsMonitor() {
   if (statsTimer !== null) window.clearInterval(statsTimer)
   statsTimer = null
+}
+
+/**
+ * Derives a per-participant connection quality from per-peer RTT/loss and
+ * pushes it into the session store so tiles can surface a signal indicator.
+ */
+function applyPeerQuality() {
+  const byPeer = realtime?.getPeerQuality()
+  if (!byPeer || byPeer.size === 0) return
+  const participants = store().participants
+  const byParticipant = new Map<ID, ConnectionQuality>()
+  for (const participant of participants) {
+    if (!participant.peerId) continue
+    const quality = byPeer.get(participant.peerId)
+    if (quality) byParticipant.set(participant.id, quality)
+  }
+  if (byParticipant.size > 0) store().applyQuality(byParticipant)
 }
 
 /**
@@ -904,6 +942,7 @@ function handleRealtimeEvent(event: RoomEvent) {
             duration: 5000,
           })
         }
+        maybeNotifyNewMessage(message)
       }
       break
     }

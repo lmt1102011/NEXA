@@ -1,6 +1,6 @@
 import { joinRoom, type DataPayload, type MessageAction, type Room } from 'trystero'
 import { ICE_SERVERS } from './iceServers'
-import type { ID, Participant } from '@/types'
+import type { ConnectionQuality, ID, Participant } from '@/types'
 import type {
   RealtimeService,
   RemoteStreamListener,
@@ -10,6 +10,13 @@ import type {
 } from './types'
 
 const APP_ID = 'nexa-call-v2'
+
+function classifyQuality(rtt: number, loss: number): ConnectionQuality {
+  if (loss >= 8 || rtt >= 400) return 'poor'
+  if (loss >= 3 || rtt >= 200) return 'fair'
+  if (loss >= 1 || rtt >= 100) return 'good'
+  return 'excellent'
+}
 
 const EVENT_TYPES = [
   'peer-hello',
@@ -65,6 +72,8 @@ export class TrysteroRealtimeService implements RealtimeService {
   private streamListeners = new Set<RemoteStreamListener>()
   private peerByParticipant = new Map<ID, string>()
   private participantByPeer = new Map<string, ID>()
+  private peerRtt = new Map<string, number>()
+  private peerRx = new Map<string, { rxPackets: number; rxLost: number }>()
   private statsPrev: StatsBucket | null = null
   private senders: Partial<Record<EventType, (event: RoomEvent) => void>> = {}
   private pendingStream: MediaStream | null = null
@@ -219,10 +228,13 @@ export class TrysteroRealtimeService implements RealtimeService {
     if (peerIds.length === 0) return null
 
     const rtts: number[] = []
+    const peerRtt = new Map<string, number>()
     await Promise.all(
       peerIds.map(async (id) => {
         try {
-          rtts.push(await this.room!.ping(id))
+          const rtt = await this.room!.ping(id)
+          rtts.push(rtt)
+          peerRtt.set(id, rtt)
         } catch {
           // peer dropped mid-measurement
         }
@@ -231,6 +243,7 @@ export class TrysteroRealtimeService implements RealtimeService {
 
     const now = Date.now()
     const bucket: StatsBucket = { at: now, rxPackets: 0, rxLost: 0, txBytes: 0 }
+    const peerRx = new Map<string, { rxPackets: number; rxLost: number }>()
     let jitterMs = 0
     for (const peerId of peerIds) {
       const pc = this.room.getPeers()[peerId]
@@ -250,6 +263,11 @@ export class TrysteroRealtimeService implements RealtimeService {
           if (stats.type === 'inbound-rtp' && stats.kind === 'video') {
             bucket.rxPackets += stats.packetsReceived ?? 0
             bucket.rxLost += stats.packetsLost ?? 0
+            const prevRx = peerRx.get(peerId) ?? { rxPackets: 0, rxLost: 0 }
+            peerRx.set(peerId, {
+              rxPackets: prevRx.rxPackets + (stats.packetsReceived ?? 0),
+              rxLost: prevRx.rxLost + (stats.packetsLost ?? 0),
+            })
             if (typeof stats.jitter === 'number') jitterMs = Math.max(jitterMs, stats.jitter * 1000)
           } else if (stats.type === 'outbound-rtp' && stats.kind === 'video' && !stats.remoteId) {
             bucket.txBytes += stats.bytesSent ?? 0
@@ -259,6 +277,9 @@ export class TrysteroRealtimeService implements RealtimeService {
         // stats collection is best-effort
       }
     }
+
+    this.peerRtt = peerRtt
+    this.peerRx = peerRx
 
     let loss = 0
     let bitrate = 0
@@ -279,6 +300,17 @@ export class TrysteroRealtimeService implements RealtimeService {
       loss: Number(loss.toFixed(1)),
       bitrate: Math.round(bitrate),
     }
+  }
+
+  getPeerQuality(): Map<string, ConnectionQuality> {
+    const result = new Map<string, ConnectionQuality>()
+    for (const [peerId, rtt] of this.peerRtt) {
+      const rx = this.peerRx.get(peerId)
+      const denom = (rx?.rxPackets ?? 0) + (rx?.rxLost ?? 0)
+      const loss = denom > 0 ? ((rx?.rxLost ?? 0) / denom) * 100 : 0
+      result.set(peerId, classifyQuality(rtt, loss))
+    }
+    return result
   }
 
   disconnect() {

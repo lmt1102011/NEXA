@@ -11,7 +11,9 @@ export function useBuildUpdate(intervalMs = 60_000) {
         const res = await fetch('./index.html', { cache: 'no-cache' })
         if (!res.ok) return
         const html = await res.text()
-        const match = html.match(/APP_VERSION="([^"]+)"/)
+        const match =
+          html.match(/name="app-version"\s+content="([^"]+)"/) ??
+          html.match(/content="([^"]+)"\s+name="app-version"/)
         if (match && match[1] && match[1] !== APP_VERSION) {
           if (!cancelled) setHasUpdate(true)
         }

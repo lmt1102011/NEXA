@@ -7,16 +7,22 @@ export interface Toast extends ToastInput {
   createdAt: number
 }
 
+export type RoomView = 'grid' | 'speaker'
+
 interface UiState {
   toasts: Toast[]
   panel: RoomPanel | null
   modal: RoomModal | null
   shortcutsOpen: boolean
+  view: RoomView
+  chatNotifications: boolean
   pushToast: (toast: ToastInput) => string
   dismissToast: (id: string) => void
   setPanel: (panel: RoomPanel | null) => void
   setModal: (modal: RoomModal | null) => void
   setShortcutsOpen: (open: boolean) => void
+  setView: (view: RoomView) => void
+  setChatNotifications: (enabled: boolean) => void
 }
 
 export const useUiStore = create<UiState>()((set, get) => ({
@@ -24,6 +30,8 @@ export const useUiStore = create<UiState>()((set, get) => ({
   panel: null,
   modal: null,
   shortcutsOpen: false,
+  view: 'grid',
+  chatNotifications: false,
 
   pushToast: (toast) => {
     const id = generateId('toast')
@@ -44,6 +52,10 @@ export const useUiStore = create<UiState>()((set, get) => ({
   setModal: (modal) => set({ modal }),
 
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+
+  setView: (view) => set({ view }),
+
+  setChatNotifications: (enabled) => set({ chatNotifications: enabled }),
 }))
 
 export function toast(input: ToastInput) {

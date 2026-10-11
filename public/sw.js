@@ -1,5 +1,5 @@
 const CACHE = 'nexa-v2'
-const PRECACHE = ['./', './manifest.webmanifest', './favicon.svg', './icons/icon.svg']
+const PRECACHE = ['./', './offline.html', './manifest.webmanifest', './favicon.svg', './icons/icon.svg']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -37,7 +37,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE).then((cache) => cache.put(request, copy))
           return response
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match('./'))),
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('./offline.html') || caches.match('./'))),
     )
     return
   }

@@ -1,4 +1,4 @@
-import { MessageSquare, Users, X } from 'lucide-react'
+import { Bell, BellOff, MessageSquare, Users, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { t, useT } from '@/lib/i18n'
 import { useUiStore } from '@/stores/ui'
@@ -10,6 +10,37 @@ const TABS: { key: RoomPanelKey; label: string; icon: React.ReactNode }[] = [
   { key: 'chat', label: t('Chat'), icon: <MessageSquare className="h-4 w-4" /> },
   { key: 'participants', label: t('People'), icon: <Users className="h-4 w-4" /> },
 ]
+
+function ChatNotificationToggle() {
+  const t = useT()
+  const enabled = useUiStore((state) => state.chatNotifications)
+  const setEnabled = useUiStore((state) => state.setChatNotifications)
+
+  async function toggle() {
+    if (enabled) {
+      setEnabled(false)
+      return
+    }
+    if (!('Notification' in window)) return
+    const permission = await Notification.requestPermission()
+    setEnabled(permission === 'granted')
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void toggle()}
+      aria-label={enabled ? t('Disable message notifications') : t('Enable message notifications')}
+      title={enabled ? t('Disable message notifications') : t('Enable message notifications')}
+      className={cn(
+        'grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-surface-3',
+        enabled ? 'text-accent' : 'text-ink-subtle hover:text-ink',
+      )}
+    >
+      {enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+    </button>
+  )
+}
 
 export function RoomPanel({ className, embedded = true }: { className?: string; embedded?: boolean }) {
   const t = useT()
@@ -47,6 +78,7 @@ export function RoomPanel({ className, embedded = true }: { className?: string; 
             <X className="h-4 w-4" />
           </button>
         ) : null}
+        {active === 'chat' ? <ChatNotificationToggle /> : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
