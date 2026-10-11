@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Lock, Search, SearchX, TicketPercent } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,14 @@ import type { Room } from '@/types'
 
 type SortKey = 'live' | 'people' | 'recent'
 
+/**
+ * A code is only useful if some device is announcing that room, and that
+ * announcement arrives over the peer network — a freshly opened page may not
+ * have heard it yet. Keep looking for a few seconds before saying no.
+ */
+const CODE_LOOKUP_MS = 8000
+const CODE_LOOKUP_STEP_MS = 400
+
 export default function RoomsPage() {
   const t = useT()
   const localRooms = useRoomsStore((state) => state.rooms)
@@ -23,8 +31,10 @@ export default function RoomsPage() {
   const [query, setQuery] = useState('')
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState<string | null>(null)
+  const [codePending, setCodePending] = useState(false)
   const [sort, setSort] = useState<SortKey>('live')
   const [loading, setLoading] = useState(true)
+  const codeTimer = useRef<number | null>(null)
 
   const SORT_OPTIONS: { value: SortKey; label: string }[] = [
     { value: 'live', label: t('Live') },
@@ -37,39 +47,60 @@ export default function RoomsPage() {
     return () => window.clearTimeout(timer)
   }, [])
 
+  useEffect(() => () => {
+    if (codeTimer.current !== null) window.clearTimeout(codeTimer.current)
+  }, [])
+
+  /**
+   * Walks into the room a code belongs to. Keeps polling while the directory
+   * is still syncing, so a code typed right after opening the page works.
+   */
+  function resolveCode(raw: string) {
+    if (codeTimer.current !== null) window.clearTimeout(codeTimer.current)
+    const wanted = normalizeCode(raw)
+    const startedAt = Date.now()
+
+    const tick = () => {
+      const found = findRoomByCode(wanted)
+      if (found) {
+        codeTimer.current = null
+        setCodePending(false)
+        setCodeError(null)
+        navigate(`/room/${found.id}`)
+        return
+      }
+      if (Date.now() - startedAt >= CODE_LOOKUP_MS) {
+        codeTimer.current = null
+        setCodePending(false)
+        setCodeError(
+          t('No room matches the code “{code}”. Check it, or use the invite link for a private room.', {
+            code: wanted,
+          }),
+        )
+        return
+      }
+      codeTimer.current = window.setTimeout(tick, CODE_LOOKUP_STEP_MS)
+    }
+
+    setCodePending(true)
+    setCodeError(null)
+    tick()
+  }
+
   // A code handed over from the home page (?code=ABC123) resolves on arrival.
   useEffect(() => {
     const incoming = searchParams.get('code')
     if (!incoming) return
     setCode(incoming.toUpperCase())
-    if (findRoomByCode(incoming)) {
-      setCodeError(null)
-      navigate(`/room/${findRoomByCode(incoming)!.id}`)
-    } else {
-      setCodeError(
-        t('No room matches the code “{code}”. Check it, or use the invite link for a private room.', {
-          code: incoming.toUpperCase(),
-        }),
-      )
-    }
+    resolveCode(incoming)
     setSearchParams({}, { replace: true })
-  }, [searchParams, t, setSearchParams, navigate])
+  }, [searchParams, setSearchParams, t])
 
   function handleCodeSubmit(event: React.FormEvent) {
     event.preventDefault()
     const trimmed = code.trim()
     if (!trimmed) return
-    const found = findRoomByCode(trimmed)
-    if (!found) {
-      setCodeError(
-        t('No room matches the code “{code}”. Check it, or use the invite link for a private room.', {
-          code: normalizeCode(trimmed),
-        }),
-      )
-      return
-    }
-    setCodeError(null)
-    navigate(`/room/${found.id}`)
+    resolveCode(trimmed)
   }
 
   const results = useMemo(() => {
@@ -140,8 +171,8 @@ export default function RoomsPage() {
               className="pl-10 font-mono tracking-[0.2em] uppercase"
             />
           </div>
-          <Button type="submit" size="md" disabled={!code.trim()}>
-            {t('Join')}
+          <Button type="submit" size="md" disabled={!code.trim()} loading={codePending}>
+            {codePending ? t('Searching…') : t('Join')}
           </Button>
         </form>
         <div className="w-full overflow-x-auto pb-1 sm:w-auto sm:pb-0">
