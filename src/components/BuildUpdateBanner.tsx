@@ -5,12 +5,13 @@ import { useT } from '@/lib/i18n'
 import { useBuildUpdate } from '@/hooks/useBuildUpdate'
 
 /**
- * Polls the deployed `index.html` for a newer build version and offers a
- * one-tap reload so a stale tab never stays stuck on an outdated bundle.
+ * Polls the deployed `index.html` for a newer build version and swaps the tab
+ * over to it, so a stale client never keeps running a bundle whose hashed
+ * chunks have already been purged.
  */
 export function BuildUpdateBanner({ className }: { className?: string }) {
   const t = useT()
-  const hasUpdate = useBuildUpdate()
+  const { hasUpdate, reloadNow } = useBuildUpdate()
 
   return (
     <AnimatePresence>
@@ -27,14 +28,14 @@ export function BuildUpdateBanner({ className }: { className?: string }) {
           role="status"
           aria-live="polite"
         >
-          <span className="text-[13px] font-medium text-ink">{t('A new version is available')}</span>
+          <span className="text-[13px] font-medium text-ink">{t('Updating to the latest version…')}</span>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={reloadNow}
             className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-solid px-3 text-[13px] font-medium text-white transition-colors hover:bg-accent-solid-hover"
           >
             <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-            {t('Reload')}
+            {t('Reload now')}
           </button>
         </motion.div>
       ) : null}

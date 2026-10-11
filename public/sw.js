@@ -1,24 +1,24 @@
-const CACHE = 'nexa-v2'
+const CACHE = 'nexa-v__BUILD_VERSION__'
 const PRECACHE = ['./', './offline.html', './manifest.webmanifest', './favicon.svg', './icons/icon.svg']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE)),
+      .then((cache) => cache.addAll(PRECACHE))
+      .catch(() => undefined),
   )
+  // A freshly deployed build takes over right away instead of sitting in the
+  // waiting state while the open tab keeps running stale, now-purged chunks.
+  self.skipWaiting()
 })
 
-// Do NOT skipWaiting()/clients.claim(): taking control mid-session forces a
-// full reload right as the user is interacting (tapping an input, joining
-// a room), which drops focus and makes the app feel broken on mobile.
-// New builds simply activate on the next visit — the app's `controllerchange`
-// listener already reloads once when that happens.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))),
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
   )
 })
 
@@ -29,29 +29,25 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone()
-          caches.open(CACHE).then((cache) => cache.put(request, copy))
-          return response
-        })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match('./offline.html') || caches.match('./'))),
-    )
-    return
-  }
-
+  // Hashed assets are always revalidated against the network: a cached URL
+  // that a later deploy purged would otherwise 404 and break lazy routes.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached
-      return fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         if (response.ok && response.type === 'basic') {
           const copy = response.clone()
           caches.open(CACHE).then((cache) => cache.put(request, copy))
         }
         return response
       })
-    }),
+      .catch(() =>
+        caches.match(request).then((cached) => {
+          if (cached) return cached
+          if (request.mode !== 'navigate') return undefined
+          // This build's own shell first, then the offline page — the cache is
+          // versioned per deploy, so a cached shell can never be stale.
+          return caches.match('./').then((shell) => shell ?? caches.match('./offline.html'))
+        }),
+      ),
   )
 })

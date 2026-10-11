@@ -162,6 +162,8 @@ export const commonVi: Record<string, TranslationEntry> = {
   'Sent a file': 'Đã gửi một tệp',
 
   // ---- build update ----
+  'Updating to the latest version…': 'Đang cập nhật lên bản mới nhất…',
+  'Reload now': 'Tải lại ngay',
   'A new version is available': 'Đã có phiên bản mới',
   Reload: 'Tải lại',
 }

@@ -80,9 +80,9 @@ export default function HomePage() {
             <motion.p
               variants={heroMotion}
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-ink-subtle"
+              className="mt-3 text-[11px] font-semibold tracking-[0.2em] text-ink-subtle"
             >
-              Made By LMT
+              Made By Le Minh Tri
             </motion.p>
 
             <motion.p

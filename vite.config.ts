@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
 import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
@@ -37,6 +38,19 @@ function versionPlugin(version: string): Plugin {
         '</head>',
         `  <meta name="app-version" content="${version}" />\n  </head>`,
       )
+    },
+    // The service worker is copied verbatim from public/, so stamp the build
+    // version here: every deploy then opens a fresh cache and the activate
+    // handler drops the previous one, instead of serving purged hashed chunks.
+    writeBundle(options) {
+      const file = path.join(
+        path.resolve(options.dir ?? path.resolve(rootDir, 'dist')),
+        'sw.js',
+      )
+      if (!fs.existsSync(file)) return
+      const source = fs.readFileSync(file, 'utf8')
+      if (!source.includes('__BUILD_VERSION__')) return
+      fs.writeFileSync(file, source.replace('__BUILD_VERSION__', version))
     },
   }
 }
