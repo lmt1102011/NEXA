@@ -80,7 +80,6 @@ export function ChatPanel() {
 
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
-  const [search, setSearch] = useState('')
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null)
   const [mentionIndex, setMentionIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
@@ -114,15 +113,7 @@ export function ChatPanel() {
 
 
   const typingNames = Object.values(typing).map((entry) => entry.name)
-  const visibleMessages = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return messages
-    return messages.filter(
-      (message) =>
-        message.text.toLowerCase().includes(query) ||
-        message.senderName.toLowerCase().includes(query),
-    )
-  }, [messages, search])
+  const visibleMessages = useMemo(() => messages, [messages])
 
   useEffect(() => {
     markRead()
@@ -211,22 +202,13 @@ export function ChatPanel() {
         <div className="flex items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2">
           <Search className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
           <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={''}
+            onChange={() => {}}
             placeholder={t('Search messages…')}
             aria-label={t('Search messages')}
-            className="h-7 w-full bg-transparent text-[12.5px] text-ink placeholder:text-ink-subtle focus:outline-none"
+            disabled
+            className="h-7 w-full bg-transparent text-[12.5px] text-ink-subtle placeholder:text-ink-subtle"
           />
-          {search ? (
-            <button
-              type="button"
-              aria-label={t('Clear search')}
-              onClick={() => setSearch('')}
-              className="grid h-5 w-5 shrink-0 place-items-center rounded text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -234,12 +216,8 @@ export function ChatPanel() {
         {visibleMessages.length === 0 ? (
           <EmptyState
             icon={<SendHorizontal className="h-5 w-5" />}
-            title={search ? t('No messages match') : t('No messages yet')}
-            description={
-              search
-                ? t('Try a different search term.')
-                : t('Say hi — messages are visible to everyone in the room.')
-            }
+            title={t('No messages yet')}
+            description={t('Say hi — messages are visible to everyone in the room.')}
             className="py-10"
           />
         ) : (

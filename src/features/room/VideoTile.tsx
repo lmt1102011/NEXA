@@ -91,9 +91,9 @@ export const VideoTile = memo(function VideoTile({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.96, y: 8 }}
+      initial={{ opacity: 0, scale: 0.98, y: 6 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1], delay: Math.min(index * 0.045, 0.4) }}
+      transition={{ duration: 0.24, ease: [0.25, 0.1, 0.25, 1], delay: Math.min(index * 0.03, 0.25) }}
       className={cn(
         'group relative min-h-0 overflow-hidden rounded-xl border bg-surface-2 transition-shadow duration-200 sm:rounded-2xl',
         participant.handRaised
