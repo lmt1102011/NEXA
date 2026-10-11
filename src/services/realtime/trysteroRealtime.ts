@@ -18,6 +18,8 @@ const EVENT_TYPES = [
   'peer-leave',
   'heartbeat',
   'chat',
+  'chat-edit',
+  'chat-delete',
   'pin',
   'activity',
   'reaction',
@@ -57,6 +59,7 @@ export class TrysteroRealtimeService implements RealtimeService {
   private self: Participant | null = null
   private announced = false
   private sentStream: MediaStream | null = null
+  private sentTracks = new Set<MediaStreamTrack>()
   private actions = new Map<EventType, MessageAction<DataPayload>>()
   private listeners = new Set<RoomEventListener>()
   private streamListeners = new Set<RemoteStreamListener>()
@@ -134,9 +137,20 @@ export class TrysteroRealtimeService implements RealtimeService {
       return
     }
     this.pendingStream = null
-    if (stream === this.sentStream) return
-    if (this.sentStream) this.room.removeStream(this.sentStream)
+
+    const nextTracks = new Set(stream?.getTracks() ?? [])
+    if (stream === this.sentStream && sameTracks(nextTracks, this.sentTracks)) return
+
+    // The MediaEngine keeps one long-lived MediaStream and swaps tracks in/out
+    // (e.g. reapplyAudio replaces the mic track on the same stream object).
+    // Trystero tracks ownership by the stream *object*, so re-adding an already
+    // attached stream is a no-op. Release the previously registered object (not
+    // a rebuilt one) so the freshly captured track actually gets attached.
+    if (this.sentStream) {
+      this.room.removeStream(this.sentStream)
+    }
     this.sentStream = stream
+    this.sentTracks = nextTracks
     if (stream) {
       for (const promise of this.room.addStream(stream)) promise.catch(() => {})
     }
@@ -274,6 +288,7 @@ export class TrysteroRealtimeService implements RealtimeService {
     this.self = null
     this.announced = false
     this.sentStream = null
+    this.sentTracks = new Set()
     this.actions.clear()
     this.senders = {}
     this.peerByParticipant.clear()
@@ -415,4 +430,12 @@ export class TrysteroRealtimeService implements RealtimeService {
     }
     for (const listener of this.listeners) listener(event)
   }
+}
+
+function sameTracks(a: Set<MediaStreamTrack>, b: Set<MediaStreamTrack>): boolean {
+  if (a.size !== b.size) return false
+  for (const track of a) {
+    if (!b.has(track)) return false
+  }
+  return true
 }

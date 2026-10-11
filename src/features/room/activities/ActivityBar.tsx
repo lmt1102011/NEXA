@@ -79,11 +79,13 @@ export function ActivityBar() {
   const t = useT()
   const self = useRoomSessionStore((state) => state.self)
   const pollCount = useRoomSessionStore((state) => state.polls.length)
-  const taskCount = useRoomSessionStore((state) => state.tasks.length)
+  const tasks = useRoomSessionStore((state) => state.tasks)
   const todos = useRoomSessionStore((state) => state.todos)
   const hasTimer = useRoomSessionStore((state) => Boolean(state.timer))
   const isModerator = Boolean(self && (self.role === 'host' || self.permissions?.canModerate))
   const todoCount = isModerator ? todos.length : todos.filter((todo) => todo.createdBy === self?.id).length
+  // Non-hosts only see the tasks assigned to them; hosts/moderators see everything.
+  const taskCount = isModerator ? tasks.length : tasks.filter((task) => task.assigneeId === self?.id).length
   const activitiesUnread = useRoomSessionStore((state) => state.activitiesUnread)
   const markActivitiesRead = useRoomSessionStore((state) => state.markActivitiesRead)
   const [openKind, setOpenKind] = useState<ActivityKind | null>(null)
@@ -302,10 +304,13 @@ function PollsList() {
 
 function TasksList() {
   const tasks = useRoomSessionStore((state) => state.tasks)
-  if (tasks.length === 0) return null
+  const self = useRoomSessionStore((state) => state.self)
+  const isModerator = Boolean(self && (self.role === 'host' || self.permissions?.canModerate))
+  const visible = isModerator ? tasks : tasks.filter((task) => task.assigneeId === self?.id)
+  if (visible.length === 0) return null
   return (
     <>
-      {tasks.map((task) => (
+      {visible.map((task) => (
         <TaskRow key={task.id} task={task} />
       ))}
     </>

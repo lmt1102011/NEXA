@@ -1,4 +1,4 @@
-import { Disc3, Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users } from 'lucide-react'
+import { Keyboard, Link2, LogOut, MessageSquare, MonitorUp, Settings, SlidersHorizontal, Users } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
@@ -6,7 +6,7 @@ import { useT } from '@/lib/i18n'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import { useCallStore } from '@/stores/call'
 import { useUiStore } from '@/stores/ui'
-import { toggleRecording, toggleScreenShare } from '@/features/room/session/sessionController'
+import { toggleScreenShare } from '@/features/room/session/sessionController'
 
 export function MoreSheet() {
   const modal = useUiStore((state) => state.modal)
@@ -16,7 +16,6 @@ export function MoreSheet() {
   const self = useRoomSessionStore((state) => state.self)
   const requests = useRoomSessionStore((state) => state.requests.length)
   const sharing = useCallStore((state) => state.sharing)
-  const recording = useCallStore((state) => state.recording)
   const navigate = useNavigate()
   const { roomId } = useParams()
   const t = useT()
@@ -37,13 +36,6 @@ export function MoreSheet() {
       tone: 'danger',
       active: sharing,
       onClick: () => void toggleScreenShare(),
-    },
-    {
-      icon: <Disc3 className="h-4.5 w-4.5" />,
-      label: recording ? t('Stop recording') : t('Record'),
-      tone: 'danger',
-      active: recording,
-      onClick: () => toggleRecording(),
     },
     { icon: <SlidersHorizontal className="h-4.5 w-4.5" />, label: t('Devices'), onClick: () => setModal('devices') },
     { icon: <Link2 className="h-4.5 w-4.5" />, label: t('Invite'), onClick: () => setModal('invite') },
@@ -77,8 +69,8 @@ export function MoreSheet() {
               key={entry.label}
               type="button"
               onClick={() => {
-                entry.onClick()
                 close()
+                entry.onClick()
               }}
               className={cn(
                 'flex flex-col items-center gap-2 rounded-xl border px-2 py-3.5 text-center transition-colors',

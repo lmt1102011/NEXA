@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { Check, ClipboardCopy, Download, FileText, Paperclip, Pin, Reply, Search, SendHorizontal, SmilePlus, X } from 'lucide-react'
+import { Check, ClipboardCopy, Download, FileText, Paperclip, Pencil, Pin, Reply, Search, SendHorizontal, SmilePlus, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { useCopy } from '@/hooks'
@@ -10,6 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { EmptyState } from '@/components/ui/empty-state'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import {
+  deleteChatMessage,
+  editChatMessage,
   pinMessage,
   sendChatMessage,
   sendFileMessage,
@@ -30,6 +32,42 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Renders message text with `@Name` tokens highlighted. Names are matched
+ * literally (longest first) so multi-word display names work, and the reader's
+ * own name is emphasised.
+ */
+function renderMentionText(text: string, names: string[], selfName: string) {
+  const sorted = [...new Set(names.filter(Boolean))].sort((a, b) => b.length - a.length)
+  if (sorted.length === 0 || !text.includes('@')) return text
+  const pattern = new RegExp(`@(${sorted.map(escapeRegExp).join('|')})(?![\\p{L}\\p{N}])`, 'giu')
+  const nodes: ReactNode[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) nodes.push(text.slice(last, match.index))
+    const selfHit = selfName.length > 0 && match[1].toLowerCase() === selfName.toLowerCase()
+    nodes.push(
+      <span
+        key={`${match.index}:${match[1]}`}
+        className={cn(
+          'rounded px-0.5 font-medium',
+          selfHit ? 'bg-accent/20 text-accent' : 'text-accent',
+        )}
+      >
+        {match[0]}
+      </span>,
+    )
+    last = match.index + match[0].length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
 export function ChatPanel() {
   const messages = useRoomSessionStore((state) => state.messages)
   const room = useRoomSessionStore((state) => state.room)
@@ -43,13 +81,37 @@ export function ChatPanel() {
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [search, setSearch] = useState('')
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollPinned = useRef(true)
   const typingTimer = useRef<number | null>(null)
 
   const chatEnabled = room?.settings.chat.enabled ?? true
   const allowFiles = room?.settings.chat.allowFiles ?? true
+
+  const participants = useRoomSessionStore((state) => state.participants)
+  const mentionCandidates = useMemo(() => {
+    if (!mention) return []
+    const query = mention.query
+    return participants
+      .filter((participant) => participant.id !== self?.id)
+      .filter((participant) => participant.name.toLowerCase().includes(query))
+      .slice(0, 6)
+  }, [mention, participants, self?.id])
+
+  function applyMention(name: string) {
+    if (!mention) return
+    const next = draft.slice(0, mention.start) + '@' + name + ' '
+    setDraft(next)
+    setMention(null)
+    setMentionIndex(0)
+    sendTyping(true)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
 
   const typingNames = Object.values(typing).map((entry) => entry.name)
   const visibleMessages = useMemo(() => {
@@ -78,6 +140,9 @@ export function ChatPanel() {
     sendTyping(value.trim().length > 0)
     if (typingTimer.current !== null) window.clearTimeout(typingTimer.current)
     typingTimer.current = window.setTimeout(() => sendTyping(false), 2500)
+    const active = /(?:^|\s)@([\p{L}\p{N}._'-]*)$/u.exec(value)
+    setMention(active ? { query: active[1].toLowerCase(), start: value.length - active[1].length - 1 } : null)
+    setMentionIndex(0)
   }
 
   useEffect(() => {
@@ -99,6 +164,7 @@ export function ChatPanel() {
     sendChatMessage(trimmed, replyTo ?? undefined)
     setDraft('')
     setReplyTo(null)
+    setMention(null)
     sendTyping(false)
     scrollPinned.current = true
   }
@@ -230,6 +296,27 @@ export function ChatPanel() {
       ) : null}
 
       <div className="shrink-0 border-t border-line p-2.5">
+        {mention && mentionCandidates.length > 0 ? (
+          <div className="mb-1.5 overflow-hidden rounded-xl border border-line bg-surface-2 shadow-lg">
+            {mentionCandidates.map((participant, index) => (
+              <button
+                key={participant.id}
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  applyMention(participant.name)
+                }}
+                className={cn(
+                  'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] transition-colors',
+                  index === mentionIndex ? 'bg-accent-soft text-ink' : 'text-ink-muted hover:bg-surface-3',
+                )}
+              >
+                <Avatar name={participant.name} color={participant.avatarColor} size="sm" />
+                <span className="truncate">{participant.name}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="flex items-end gap-1.5 rounded-xl border border-line bg-surface-2 p-1.5 transition-[border-color,box-shadow] focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/20">
           {allowFiles ? (
             <>
@@ -255,9 +342,31 @@ export function ChatPanel() {
           ) : null}
 
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(event) => handleDraftChange(event.target.value)}
             onKeyDown={(event) => {
+              if (mention && mentionCandidates.length > 0) {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault()
+                  setMentionIndex((index) => (index + 1) % mentionCandidates.length)
+                  return
+                }
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault()
+                  setMentionIndex((index) => (index - 1 + mentionCandidates.length) % mentionCandidates.length)
+                  return
+                }
+                if (event.key === 'Enter' || event.key === 'Tab') {
+                  event.preventDefault()
+                  applyMention(mentionCandidates[mentionIndex].name)
+                  return
+                }
+                if (event.key === 'Escape') {
+                  setMention(null)
+                  return
+                }
+              }
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
                 submit()
@@ -288,9 +397,13 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
   const self = useRoomSessionStore((state) => state.self)
   const pinnedMessage = useRoomSessionStore((state) => state.pinnedMessage)
   const settings = useRoomSessionStore((state) => state.room?.settings)
+  const participants = useRoomSessionStore((state) => state.participants)
   const t = useT()
   const { copied, copy } = useCopy()
   const [actionsOpen, setActionsOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState('')
+  const editRef = useRef<HTMLTextAreaElement>(null)
   const pressTimer = useRef<number | null>(null)
 
   function startPress() {
@@ -318,8 +431,27 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
   const reactionEntries = Object.entries(message.reactions)
   const mineActive = (emoji: string) => (message.reactions[emoji] ?? []).includes(self?.id ?? '')
   const canPin = own || self?.role === 'host' || Boolean(self?.permissions?.canModerate)
+  const canDelete = (own || self?.role === 'host' || Boolean(self?.permissions?.canModerate)) && !message.deleted
+  const canEdit = own && message.kind === 'text' && !message.deleted
   const isPinned = pinnedMessage?.id === message.id
+  const isDeleted = Boolean(message.deleted)
   const bubbleText = message.kind === 'file' && message.file ? message.file.name : message.text
+  const mentionNames = participants.map((participant) => participant.name)
+
+  function beginEdit() {
+    setEditDraft(message.text)
+    setEditing(true)
+    setActionsOpen(false)
+    requestAnimationFrame(() => {
+      editRef.current?.focus()
+      editRef.current?.setSelectionRange(message.text.length, message.text.length)
+    })
+  }
+
+  function commitEdit() {
+    editChatMessage(message.id, editDraft)
+    setEditing(false)
+  }
 
   return (
     <motion.div
@@ -339,47 +471,99 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
         <div className={cn('flex items-baseline gap-2', own && 'flex-row-reverse')}>
           <span className="text-[12px] font-medium text-ink-muted">{own ? t('You') : message.senderName}</span>
           <span className="font-mono text-[10.5px] text-ink-subtle">{formatTime(message.createdAt)}</span>
+          {message.editedAt && !isDeleted ? (
+            <span className="text-[10.5px] italic text-ink-subtle">{t('(edited)')}</span>
+          ) : null}
         </div>
 
         <div
-          onTouchStart={startPress}
-          onTouchEnd={cancelPress}
-          onTouchMove={cancelPress}
+          onTouchStart={editing ? undefined : startPress}
+          onTouchEnd={editing ? undefined : cancelPress}
+          onTouchMove={editing ? undefined : cancelPress}
           onContextMenu={(event) => {
+            if (editing) return
             event.preventDefault()
             cancelPress()
             setActionsOpen((open) => !open)
           }}
           className={cn(
-            'mt-1 rounded-xl px-3 py-2 text-[13.5px] leading-relaxed select-none',
+            'mt-1 rounded-xl px-3 py-2 text-[13.5px] leading-relaxed',
+            editing ? 'w-full' : 'select-none',
             own ? 'rounded-tr-sm bg-accent-soft text-ink' : 'rounded-tl-sm border border-line bg-surface-2 text-ink',
           )}
         >
-          {message.replyTo ? (
-            <div className="mb-1.5 rounded-lg border-l-2 border-accent/60 bg-black/10 px-2 py-1">
-              <p className="text-[11px] font-medium text-accent">{message.replyTo.name}</p>
-              <p className="truncate text-[12px] text-ink-muted">{message.replyTo.text}</p>
+          {editing ? (
+            <div className="flex min-w-[220px] flex-col gap-1.5">
+              <textarea
+                ref={editRef}
+                value={editDraft}
+                onChange={(event) => setEditDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    commitEdit()
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault()
+                    setEditing(false)
+                  }
+                }}
+                rows={2}
+                className="max-h-40 min-h-9 w-full resize-none rounded-lg border border-line bg-surface px-2 py-1.5 text-[13.5px] text-ink focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="rounded-lg px-2 py-1 text-[12px] font-medium text-ink-muted transition-colors hover:bg-surface-3"
+                >
+                  {t('Cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={commitEdit}
+                  disabled={!editDraft.trim()}
+                  className="rounded-lg bg-accent-solid px-2.5 py-1 text-[12px] font-medium text-white transition-colors hover:bg-accent-solid-hover disabled:opacity-50"
+                >
+                  {t('Save')}
+                </button>
+              </div>
             </div>
-          ) : null}
-          {message.kind === 'file' && message.file ? (
-            <a
-              href={message.file.url}
-              download={message.file.name}
-              className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-2.5 py-2 transition-colors hover:border-line-strong"
-            >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-                <FileText className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-[13px] font-medium text-ink">{message.file.name}</span>
-                <span className="block font-mono text-[11px] text-ink-subtle">
-                  {formatFileSize(message.file.size)}
-                </span>
-              </span>
-              <Download className="ml-auto h-4 w-4 shrink-0 text-ink-subtle" />
-            </a>
+          ) : isDeleted ? (
+            <span className="inline-flex items-center gap-1.5 italic text-ink-subtle">
+              <Trash2 className="h-3.5 w-3.5" />
+              {t('This message was deleted')}
+            </span>
           ) : (
-            <span className="whitespace-pre-wrap break-words select-text">{message.text}</span>
+            <>
+              {message.replyTo ? (
+                <div className="mb-1.5 rounded-lg border-l-2 border-accent/60 bg-black/10 px-2 py-1">
+                  <p className="text-[11px] font-medium text-accent">{message.replyTo.name}</p>
+                  <p className="truncate text-[12px] text-ink-muted">{message.replyTo.text}</p>
+                </div>
+              ) : null}
+              {message.kind === 'file' && message.file ? (
+                <a
+                  href={message.file.url}
+                  download={message.file.name}
+                  className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-2.5 py-2 transition-colors hover:border-line-strong"
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+                    <FileText className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-medium text-ink">{message.file.name}</span>
+                    <span className="block font-mono text-[11px] text-ink-subtle">
+                      {formatFileSize(message.file.size)}
+                    </span>
+                  </span>
+                  <Download className="ml-auto h-4 w-4 shrink-0 text-ink-subtle" />
+                </a>
+              ) : (
+                <span className="whitespace-pre-wrap break-words select-text">
+                  {renderMentionText(message.text, mentionNames, self?.name ?? '')}
+                </span>
+              )}
+            </>
           )}
         </div>
 
@@ -426,11 +610,34 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
                 {isPinned ? t('Unpin') : t('Pin')}
               </button>
             ) : null}
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={beginEdit}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-ink transition-colors hover:bg-surface-3"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                {t('Edit')}
+              </button>
+            ) : null}
+            {canDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  deleteChatMessage(message.id)
+                  setActionsOpen(false)
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-danger transition-colors hover:bg-danger/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t('Delete')}
+              </button>
+            ) : null}
           </motion.div>
         ) : null}
 
         <div className={cn('mt-1 flex flex-wrap items-center gap-1.5', own && 'flex-row-reverse')}>
-          {allowReactions ? (
+          {allowReactions && !isDeleted ? (
             <>
               {reactionEntries.map(([emoji, users]) => (
                 <button
@@ -475,7 +682,7 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
             </>
           ) : null}
 
-          {canPin ? (
+          {canPin && !isDeleted ? (
             <button
               type="button"
               aria-label={isPinned ? t('Unpin message') : t('Pin message')}

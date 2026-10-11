@@ -19,7 +19,7 @@ export function Toaster() {
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="pointer-events-none fixed inset-x-4 top-4 z-[110] flex flex-col gap-2.5 sm:inset-x-auto sm:right-4 sm:w-[370px]"
+      className="pointer-events-none fixed inset-x-4 top-16 z-[110] flex flex-col gap-2.5 sm:inset-x-auto sm:right-4 sm:top-4 sm:w-[370px]"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <AnimatePresence initial={false}>

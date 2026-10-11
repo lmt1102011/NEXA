@@ -71,6 +71,8 @@ interface RoomSessionState {
 
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
+  editMessage: (id: ID, text: string, editedAt?: number) => void
+  deleteMessage: (id: ID) => void
   setPinnedMessage: (message: ChatMessage | null) => void
   setActivities: (activities: {
     polls: Poll[]
@@ -302,6 +304,29 @@ export const useRoomSessionStore = create<RoomSessionState>()((set, get) => ({
       messages,
       pinnedMessage:
         state.pinnedMessage && messages.some((m) => m.id === state.pinnedMessage?.id) ? state.pinnedMessage : null,
+    })),
+
+  editMessage: (id, text, editedAt) =>
+    set((state) => ({
+      messages: state.messages.map((message) =>
+        message.id === id && message.kind === 'text' && !message.deleted
+          ? { ...message, text, editedAt: editedAt ?? Date.now() }
+          : message,
+      ),
+      pinnedMessage:
+        state.pinnedMessage?.id === id
+          ? { ...state.pinnedMessage, text, editedAt: editedAt ?? Date.now() }
+          : state.pinnedMessage,
+    })),
+
+  deleteMessage: (id) =>
+    set((state) => ({
+      messages: state.messages.map((message) =>
+        message.id === id && message.kind !== 'system'
+          ? { ...message, deleted: true, text: '', file: undefined, reactions: {} }
+          : message,
+      ),
+      pinnedMessage: state.pinnedMessage?.id === id ? null : state.pinnedMessage,
     })),
 
   setPinnedMessage: (message) => set({ pinnedMessage: message }),

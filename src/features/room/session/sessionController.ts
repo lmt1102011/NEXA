@@ -18,7 +18,6 @@ import type { RoomEvent, RealtimeService } from '@/services/realtime'
 import { createRealtimeService } from '@/services/realtime'
 import { mediaEngine } from '@/services/media/MediaEngine'
 import { qualityController } from '@/services/media/QualityController'
-import { recordingEngine } from '@/services/media/RecordingEngine'
 import { announceRoomDeletion } from '@/services/directory/PublicRoomsDirectory'
 import { buildFileMessage, buildSystemMessage, buildTextMessage } from '@/lib/chat'
 import { generateId, createHostToken } from '@/lib/utils'
@@ -30,7 +29,13 @@ import { useSessionStore } from '@/stores/session'
 import { toast } from '@/stores/ui'
 
 const STATS_INTERVAL_MS = 3000
-const MAX_FILE_SIZE = 2 * 1024 * 1024
+const MAX_FILE_SIZE = 16 * 1024 * 1024
+/**
+ * The wire (Trystero) transparently chunks large action payloads, so files no
+ * longer have to fit one frame. This cap only guards how big a base64 data URL
+ * we accept from a peer into memory.
+ */
+const MAX_FILE_DATA_URL = 23_000_000
 
 /**
  * Participants broadcast a heartbeat every PRESENCE_INTERVAL_MS and everyone
@@ -106,7 +111,6 @@ let reconnectAttempts = 0
 let hardReconnects = 0
 let lastTypingSent = 0
 let typingActive = false
-let recordingListenerAttached = false
 const typingTimers = new Map<ID, number>()
 
 function notify(input: ToastInput) {
@@ -277,7 +281,6 @@ function stopLocalMedia() {
   stopReconnectMonitor()
   stopAutoExpire()
   cleanupTransport()
-  if (recordingEngine.recording) recordingEngine.stop()
   mediaEngine.dispose()
   useCallStore.getState().reset()
 }
@@ -371,15 +374,19 @@ function applyRoomAvSettings() {
   const av = store().room?.settings.av
   if (!av) return
   if (!mediaEngine.isPrefsLocked()) {
-    mediaEngine.setPreferences({
+    const target = {
       echoCancellation: av.echoCancellation,
-      noiseSuppression: av.noiseFilter !== 'off',
+      noiseStrength: av.noiseFilter,
       autoGainControl: av.noiseFilter !== 'off',
       videoQuality: av.videoQuality,
       audioQuality: av.audioQuality,
-    })
-    void mediaEngine.applyVideoQuality()
-    void mediaEngine.reapplyAudio()
+    }
+    const needsReapply = mediaEngine.audioNeedsReapply(target)
+    mediaEngine.setPreferences(target)
+    if (needsReapply) {
+      void mediaEngine.applyVideoQuality()
+      void mediaEngine.reapplyAudio()
+    }
   }
   applyRoomQualityCaps()
 }
@@ -535,7 +542,7 @@ async function prepareMedia(audio: boolean, camera: boolean, silent: boolean) {
     const noiseFilter = av?.noiseFilter ?? 'light'
     mediaEngine.setPreferences({
       echoCancellation: av?.echoCancellation ?? true,
-      noiseSuppression: noiseFilter !== 'off',
+      noiseStrength: noiseFilter,
       autoGainControl: noiseFilter !== 'off',
       videoQuality: av?.videoQuality ?? 'auto',
       audioQuality: av?.audioQuality ?? 'auto',
@@ -648,7 +655,7 @@ function sanitizeIncomingMessage(
   if (message.kind === 'file') {
     const incoming = message.file
     if (!incoming || typeof incoming.url !== 'string' || !incoming.url.startsWith('data:')) return null
-    if (incoming.url.length > 3_000_000) return null
+    if (incoming.url.length > MAX_FILE_DATA_URL) return null
     file = {
       name: String(incoming.name ?? 'file').slice(0, 200),
       size: Number.isFinite(incoming.size) ? Number(incoming.size) : 0,
@@ -656,6 +663,9 @@ function sanitizeIncomingMessage(
       url: incoming.url,
     }
   }
+  const mentions = Array.isArray(message.mentions)
+    ? message.mentions.filter((id): id is string => typeof id === 'string').slice(0, 50)
+    : undefined
   return {
     id: typeof message.id === 'string' && message.id ? message.id.slice(0, 80) : generateId('msg'),
     roomId: store().room?.id ?? message.roomId ?? '',
@@ -665,6 +675,7 @@ function sanitizeIncomingMessage(
     kind: file ? 'file' : 'text',
     text: typeof message.text === 'string' ? message.text.slice(0, 2000) : '',
     file,
+    mentions: file ? undefined : mentions,
     reactions: {},
     createdAt: Number.isFinite(message.createdAt) ? Number(message.createdAt) : Date.now(),
   }
@@ -879,7 +890,41 @@ function handleRealtimeEvent(event: RoomEvent) {
     }
     case 'chat': {
       const message = sanitizeIncomingMessage(event.message, event.senderId)
-      if (message) state.addMessage(message)
+      if (message) {
+        state.addMessage(message)
+        if (
+          message.mentions &&
+          message.mentions.includes(selfId ?? '') &&
+          message.senderId !== selfId
+        ) {
+          notify({
+            title: t('{name} mentioned you', { name: message.senderName }),
+            description: t('Open chat to reply.'),
+            variant: 'info',
+            duration: 5000,
+          })
+        }
+      }
+      break
+    }
+    case 'chat-edit': {
+      if (!event.senderId) break
+      const target = store().messages.find((m) => m.id === event.messageId)
+      if (!target || target.kind !== 'text' || target.deleted) break
+      // Only the author may edit their own message.
+      if (target.senderId !== event.senderId) break
+      const text = typeof event.text === 'string' ? event.text.slice(0, 2000) : ''
+      if (!text.trim()) break
+      state.editMessage(event.messageId, text.trim())
+      break
+    }
+    case 'chat-delete': {
+      if (!event.senderId) break
+      const target = store().messages.find((m) => m.id === event.messageId)
+      if (!target || target.kind === 'system') break
+      // Only the author, the host or a moderator may remove a message.
+      if (target.senderId !== event.senderId && !senderCanModerate(event.senderId)) break
+      state.deleteMessage(event.messageId)
       break
     }
     case 'pin': {
@@ -1200,6 +1245,7 @@ export function sendChatMessage(text: string, replyTo?: ChatMessage) {
     notify({ title: t('Chat is disabled in this room'), variant: 'warning' })
     return
   }
+  const trimmed = text.trim()
   const message = buildTextMessage({
     roomId: state.room.id,
     senderId: state.self.id,
@@ -1207,6 +1253,8 @@ export function sendChatMessage(text: string, replyTo?: ChatMessage) {
     avatarColor: state.self.avatarColor,
     text,
   })
+  const mentions = resolveMentions(trimmed, state.self.id)
+  if (mentions.length > 0) message.mentions = mentions
   if (replyTo) {
     message.replyTo = {
       id: replyTo.id,
@@ -1217,6 +1265,50 @@ export function sendChatMessage(text: string, replyTo?: ChatMessage) {
   state.addMessage(message)
   realtime?.emit({ type: 'chat', message })
   sendTyping(false)
+}
+
+/**
+ * Matches `@Name` tokens in an outgoing message against the live roster and
+ * returns the mentioned participant ids (excluding the author).
+ */
+function resolveMentions(text: string, selfId: ID): ID[] {
+  if (!text.includes('@')) return []
+  const participants = store().participants
+  const ids = new Set<ID>()
+  for (const match of text.matchAll(/@([\p{L}\p{N}._'-]+)/gu)) {
+    const token = match[1].toLowerCase()
+    const hit = participants.find(
+      (p) => p.id !== selfId && p.name.toLowerCase().replace(/\s+/g, '') === token.replace(/\s+/g, ''),
+    )
+    if (hit) ids.add(hit.id)
+  }
+  return [...ids]
+}
+
+/** Edits one of the local participant's own text messages. */
+export function editChatMessage(messageId: ID, text: string) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const target = state.messages.find((m) => m.id === messageId)
+  if (!target || target.senderId !== self.id || target.kind !== 'text' || target.deleted) return
+  const trimmed = text.trim()
+  if (!trimmed || trimmed === target.text) return
+  state.editMessage(messageId, trimmed, Date.now())
+  realtime?.emit({ type: 'chat-edit', messageId, text: trimmed })
+}
+
+/** Deletes a message (author, host or moderator). */
+export function deleteChatMessage(messageId: ID) {
+  const state = store()
+  const self = state.self
+  if (!self) return
+  const target = state.messages.find((m) => m.id === messageId)
+  if (!target || target.kind === 'system' || target.deleted) return
+  const canModerate = self.role === 'host' || Boolean(self.permissions?.canModerate)
+  if (target.senderId !== self.id && !canModerate) return
+  state.deleteMessage(messageId)
+  realtime?.emit({ type: 'chat-delete', messageId })
 }
 
 /**
@@ -1248,7 +1340,7 @@ export async function sendFileMessage(file: File) {
   if (file.size > MAX_FILE_SIZE) {
     notify({
       title: t('File is too large'),
-      description: t('Maximum file size is 2 MB in peer-to-peer chat.'),
+      description: t('Maximum file size is 16 MB in peer-to-peer chat.'),
       variant: 'danger',
     })
     return
@@ -1260,6 +1352,10 @@ export async function sendFileMessage(file: File) {
   } catch {
     notify({ title: t('Could not read this file'), variant: 'danger' })
     return
+  }
+
+  if (file.size > 1_000_000) {
+    notify({ title: t('Sending “{name}”…', { name: file.name }), variant: 'info' })
   }
 
   const message = buildFileMessage({
@@ -1684,76 +1780,6 @@ export async function toggleScreenShare() {
   pushOutgoingStream()
 }
 
-/** Downloads the finished recording when the recorder stops. */
-function ensureRecordingListener() {
-  if (recordingListenerAttached) return
-  recordingListenerAttached = true
-  recordingEngine.onResult(({ blob, fileName }) => {
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = fileName
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 10000)
-    notify({
-      title: t('Recording saved'),
-      description: t('{name} was downloaded to this device.', { name: fileName }),
-    })
-  })
-}
-
-/**
- * Starts or stops a local recording of your own media. Screen share wins when
- * active (that is the content being presented); otherwise the camera is used.
- * Microphone audio is always included when available.
- */
-export function toggleRecording() {
-  const call = useCallStore.getState()
-  if (!recordingEngine.supported) {
-    notify({
-      title: t('Recording is not supported on this device'),
-      description: t('Your browser cannot record media locally.'),
-      variant: 'warning',
-    })
-    return
-  }
-  ensureRecordingListener()
-
-  if (call.recording) {
-    recordingEngine.stop()
-    call.setRecording(false)
-    notify({ title: t('Recording stopped'), variant: 'default' })
-    return
-  }
-
-  const videoTrack = (mediaEngine.getScreenStream() ?? mediaEngine.getStream())?.getVideoTracks()[0]
-  const audioTrack = mediaEngine.getStream()?.getAudioTracks()[0]
-  const tracks: MediaStreamTrack[] = []
-  if (videoTrack) tracks.push(videoTrack)
-  if (audioTrack) tracks.push(audioTrack.clone())
-
-  if (tracks.length === 0) {
-    notify({
-      title: t('Nothing to record yet'),
-      description: t('Turn on your camera or microphone first.'),
-      variant: 'warning',
-    })
-    return
-  }
-
-  if (!recordingEngine.start(new MediaStream(tracks))) {
-    notify({ title: t('Could not start recording'), variant: 'danger' })
-    return
-  }
-  call.setRecording(true, Date.now())
-  notify({
-    title: t('Recording started'),
-    description: videoTrack ? t('Capturing video and audio locally.') : t('Capturing audio locally.'),
-  })
-}
-
 export async function switchDevice(kind: 'audio' | 'video', deviceId: string) {
   const call = useCallStore.getState()
   call.setActiveDevice(kind, deviceId)
@@ -1778,10 +1804,11 @@ export async function switchDevice(kind: 'audio' | 'video', deviceId: string) {
 
 export function applyLocalAudioPreferences(prefs: { noiseFilter: NoiseFilter; echoCancellation: boolean }) {
   const av = store().room?.settings.av
+  mediaEngine.setLocalNoiseFilter(prefs.noiseFilter)
   mediaEngine.setPreferences(
     {
       echoCancellation: prefs.echoCancellation,
-      noiseSuppression: prefs.noiseFilter !== 'off',
+      noiseStrength: prefs.noiseFilter,
       autoGainControl: prefs.noiseFilter !== 'off',
       videoQuality: av?.videoQuality ?? 'auto',
       audioQuality: av?.audioQuality ?? 'auto',

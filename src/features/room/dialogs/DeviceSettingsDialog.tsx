@@ -43,7 +43,7 @@ export function DeviceSettingsDialog() {
   const cameraOn = useCallStore((state) => state.cameraOn)
   const t = useT()
 
-  const [noiseFilter, setNoiseFilter] = useState<NoiseFilter>(room?.settings.av.noiseFilter ?? 'light')
+  const [noiseFilter, setNoiseFilter] = useState<NoiseFilter>(mediaEngine.getEffectiveNoiseStrength())
   const [echoCancellation, setEchoCancellation] = useState(room?.settings.av.echoCancellation ?? true)
   const [voiceDetected, setVoiceDetected] = useState(false)
 

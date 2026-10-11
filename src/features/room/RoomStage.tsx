@@ -61,6 +61,18 @@ export default function RoomStage() {
       )}
       style={stageStyle}
     >
+      {background === 'default' ? (
+        <div aria-hidden className="pointer-events-none absolute inset-0 animate-ambient">
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(42% 52% at 14% 8%, rgba(124,116,255,0.10), transparent 72%)' }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(36% 46% at 86% 92%, rgba(110,168,254,0.08), transparent 72%)' }}
+          />
+        </div>
+      ) : null}
       {presenter ? <SharingLayout presenter={presenter} participants={participants} /> : <VideoGrid participants={participants} />}
       <FloatingReactions />
       <JoinRequestBanner />

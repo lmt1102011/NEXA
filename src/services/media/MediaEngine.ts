@@ -1,5 +1,6 @@
-import type { AudioQuality, DeviceOption, VideoQuality } from '@/types'
+import type { AudioQuality, DeviceOption, NoiseFilter, VideoQuality } from '@/types'
 import type { PermissionStatus } from '@/stores/call'
+import { NoiseGate } from '@/services/media/NoiseGate'
 
 export interface PrepareResult {
   audio: PermissionStatus
@@ -8,7 +9,7 @@ export interface PrepareResult {
 
 export interface MediaConstraintsPrefs {
   echoCancellation: boolean
-  noiseSuppression: boolean
+  noiseStrength: NoiseFilter
   autoGainControl: boolean
   videoQuality: VideoQuality
   audioQuality: AudioQuality
@@ -55,7 +56,7 @@ export class MediaEngine {
   private coldFrames = 0
   private prefs: MediaConstraintsPrefs = {
     echoCancellation: true,
-    noiseSuppression: true,
+    noiseStrength: 'light',
     autoGainControl: true,
     videoQuality: 'auto',
     audioQuality: 'auto',
@@ -63,6 +64,9 @@ export class MediaEngine {
   private prefsLocked = false
   private preferredAudioId = ''
   private preferredVideoId = ''
+  private gate: NoiseGate | null = null
+  private rawAudioTrack: MediaStreamTrack | null = null
+  private localNoiseFilter: NoiseFilter | null = null
   private streamListeners = new Set<StreamListener>()
   private speakingListeners = new Set<SpeakingListener>()
 
@@ -89,19 +93,19 @@ export class MediaEngine {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: this.prefs.echoCancellation,
-          noiseSuppression: this.prefs.noiseSuppression,
+          noiseSuppression: this.prefs.noiseStrength !== 'off',
           autoGainControl: this.prefs.autoGainControl,
           sampleRate: AUDIO_SAMPLE_RATE[this.prefs.audioQuality],
           ...(this.preferredAudioId ? { deviceId: { exact: this.preferredAudioId } } : {}),
         },
-        video: false,
-      })
-      this.mergeInto(stream)
-      return 'granted'
-    } catch (error) {
-      return mapMediaError(error)
-    }
+      video: false,
+    })
+    await this.installAudio(stream)
+    return 'granted'
+  } catch (error) {
+    return mapMediaError(error)
   }
+}
 
   private async startVideo(): Promise<PermissionStatus> {
     if (this.hasVideoTrack()) return 'granted'
@@ -133,6 +137,33 @@ export class MediaEngine {
     this.stream = existing
   }
 
+  /**
+   * Routes a freshly captured mic track through the noise gate and publishes
+   * the processed track. The raw track is kept alive (but not published) so the
+   * gate can read from it. Falls back to the raw track when unsupported.
+   */
+  private async installAudio(rawStream: MediaStream) {
+    const rawTrack = rawStream.getAudioTracks()[0]
+    if (!rawTrack) {
+      this.mergeInto(rawStream)
+      return
+    }
+    this.rawAudioTrack = rawTrack
+    const gate = await NoiseGate.create(rawTrack, this.getEffectiveNoiseStrength())
+    this.gate = gate
+    this.mergeInto(gate ? new MediaStream([gate.track]) : rawStream)
+  }
+
+  /** Tears down the noise gate and stops the raw mic track it was reading from. */
+  private teardownGate() {
+    this.gate?.dispose()
+    this.gate = null
+    if (this.rawAudioTrack) {
+      this.rawAudioTrack.stop()
+      this.rawAudioTrack = null
+    }
+  }
+
   getStream(): MediaStream | null {
     return this.stream
   }
@@ -151,6 +182,7 @@ export class MediaEngine {
 
   setMic(enabled: boolean) {
     for (const track of this.stream?.getAudioTracks() ?? []) track.enabled = enabled
+    this.gate?.setMuted(!enabled)
     if (!enabled) {
       this.hotFrames = 0
       this.coldFrames = 0
@@ -187,21 +219,55 @@ export class MediaEngine {
     return this.prefsLocked
   }
 
+  /**
+   * Per-user noise filter override. Each participant picks their own setting in
+   * Device settings; `null` means "follow the room default". The override always
+   * wins over the room setting so one person's choice never affects another's.
+   */
+  setLocalNoiseFilter(value: NoiseFilter | null) {
+    const previous = this.getEffectiveNoiseStrength()
+    this.localNoiseFilter = value
+    if (this.getEffectiveNoiseStrength() !== previous) {
+      void this.reapplyAudio()
+    }
+  }
+
+  /** The noise strength actually in effect: the per-user override or the room default. */
+  getEffectiveNoiseStrength(): NoiseFilter {
+    return this.localNoiseFilter ?? this.prefs.noiseStrength
+  }
+
+  /** True when the incoming audio constraints differ from the current ones. */
+  audioNeedsReapply(next: {
+    echoCancellation: boolean
+    noiseStrength: NoiseFilter
+    autoGainControl: boolean
+    audioQuality: AudioQuality
+  }): boolean {
+    return (
+      next.echoCancellation !== this.prefs.echoCancellation ||
+      next.noiseStrength !== this.getEffectiveNoiseStrength() ||
+      next.autoGainControl !== this.prefs.autoGainControl ||
+      next.audioQuality !== this.prefs.audioQuality
+    )
+  }
+
   /** Re-acquires the microphone so latest preferences take effect immediately. */
   async reapplyAudio(): Promise<PermissionStatus> {
     try {
       const fresh = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: this.prefs.echoCancellation,
-          noiseSuppression: this.prefs.noiseSuppression,
+          noiseSuppression: this.getEffectiveNoiseStrength() !== 'off',
           autoGainControl: this.prefs.autoGainControl,
           sampleRate: AUDIO_SAMPLE_RATE[this.prefs.audioQuality],
           ...(this.preferredAudioId ? { deviceId: { exact: this.preferredAudioId } } : {}),
         },
       })
       const wasEnabled = this.stream?.getAudioTracks()[0]?.enabled ?? true
+      this.teardownGate()
       this.removeTracks('audio')
-      this.mergeInto(fresh)
+      await this.installAudio(fresh)
       this.setMic(wasEnabled)
       this.startLevelMonitor()
       this.notifyStream()
@@ -214,6 +280,7 @@ export class MediaEngine {
   async switchAudioDevice(deviceId: string): Promise<PermissionStatus> {
     this.preferredAudioId = deviceId
     const wasEnabled = this.stream?.getAudioTracks()[0]?.enabled ?? true
+    this.teardownGate()
     this.removeTracks('audio')
     const status = await this.startAudio()
     this.setMic(wasEnabled)
@@ -290,6 +357,7 @@ export class MediaEngine {
 
   dispose() {
     this.stopScreenShare()
+    this.teardownGate()
     this.removeTracks('audio')
     this.removeTracks('video')
     this.stream = null

@@ -134,8 +134,11 @@ export interface ChatMessage {
   text: string
   file?: ChatFile
   replyTo?: { id: ID; name: string; text: string }
+  mentions?: ID[]
   reactions: Record<string, ID[]>
   createdAt: number
+  editedAt?: number
+  deleted?: boolean
 }
 
 export interface CallStats {

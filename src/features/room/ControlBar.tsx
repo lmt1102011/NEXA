@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Camera,
   CameraOff,
-  Disc3,
   Ellipsis,
   Hand,
   Keyboard,
@@ -18,7 +17,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
-import { Kbd } from '@/components/ui/feedback'
 import { useBreakpoint } from '@/hooks'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
@@ -28,7 +26,6 @@ import {
   toggleCamera,
   toggleHand,
   toggleMic,
-  toggleRecording,
   toggleScreenShare,
 } from '@/features/room/session/sessionController'
 
@@ -42,7 +39,6 @@ interface ControlItem {
   active?: boolean
   badge?: number
   dot?: boolean
-  shortcut?: string
   ariaLabel: string
   onClick: () => void
   danger?: boolean
@@ -104,7 +100,6 @@ function DesktopControl({ item }: { item: ControlItem }) {
       </span>
       <span className="hidden items-center gap-1.5 lg:inline-flex">
         {item.label}
-        {item.shortcut ? <Kbd className="opacity-70">{item.shortcut}</Kbd> : null}
       </span>
     </button>
   )
@@ -189,7 +184,6 @@ export function ControlBar() {
   const micOn = useCallStore((state) => state.micOn)
   const cameraOn = useCallStore((state) => state.cameraOn)
   const sharing = useCallStore((state) => state.sharing)
-  const recording = useCallStore((state) => state.recording)
   const audioPermission = useCallStore((state) => state.audioPermission)
   const videoPermission = useCallStore((state) => state.videoPermission)
 
@@ -215,7 +209,6 @@ export function ControlBar() {
       icon: micAvailable ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />,
       label: micAvailable ? t('Mute') : t('Unmute'),
       tone: micAvailable ? 'default' : 'muted',
-      shortcut: 'M',
       ariaLabel: micAvailable ? t('Mute microphone') : t('Unmute microphone'),
       onClick: () => void toggleMic(),
     },
@@ -224,7 +217,6 @@ export function ControlBar() {
       icon: camAvailable ? <Camera className="h-[18px] w-[18px]" /> : <CameraOff className="h-[18px] w-[18px]" />,
       label: camAvailable ? t('Stop video') : t('Start video'),
       tone: camAvailable ? 'default' : 'muted',
-      shortcut: 'V',
       ariaLabel: camAvailable ? t('Turn camera off') : t('Turn camera on'),
       onClick: () => void toggleCamera(),
     },
@@ -235,7 +227,6 @@ export function ControlBar() {
       tone: sharing ? 'danger' : 'default',
       danger: sharing,
       active: sharing,
-      shortcut: 'S',
       ariaLabel: sharing ? t('Stop screen sharing') : t('Share your screen'),
       onClick: () => void toggleScreenShare(),
       disabled: !sharing && !canShare,
@@ -249,27 +240,14 @@ export function ControlBar() {
       ariaLabel: self?.handRaised ? t('Lower hand') : t('Raise hand'),
       onClick: () => toggleHand(),
     },
-    { key: 'divider-1', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
     {
       key: 'chat',
       icon: <MessageSquare className="h-[18px] w-[18px]" />,
       label: t('Chat'),
       active: panel === 'chat',
       badge: unread,
-      shortcut: 'C',
       ariaLabel: t('Open chat'),
       onClick: () => setPanel('chat'),
-    },
-    { key: 'divider-2', icon: null, label: '', ariaLabel: '', onClick: () => undefined },
-    {
-      key: 'record',
-      icon: <Disc3 className="h-[18px] w-[18px]" />,
-      label: recording ? t('Stop recording') : t('Record'),
-      tone: recording ? 'danger' : 'default',
-      danger: recording,
-      active: recording,
-      ariaLabel: recording ? t('Stop recording') : t('Start recording'),
-      onClick: () => toggleRecording(),
     },
     {
       key: 'devices',
@@ -347,7 +325,7 @@ export function ControlBar() {
           ))}
         <span className="mx-1 h-7 w-px bg-line" aria-hidden />
         {items
-          .filter((item) => ['chat', 'record'].includes(item.key))
+          .filter((item) => ['chat'].includes(item.key))
           .map((item) => (
             <DesktopControl key={item.key} item={item} />
           ))}

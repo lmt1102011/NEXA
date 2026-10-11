@@ -215,6 +215,8 @@ html.light[data-accent='amber'] {
   --animate-slide-up: nx-slide-up 0.32s var(--ease-out-soft) both;
   --animate-pulse-soft: nx-pulse-soft 2.4s ease-in-out infinite;
   --animate-speaking: nx-speaking 1.1s ease-in-out infinite;
+  --animate-slide-in-right: nx-slide-in-right 0.28s var(--ease-out-soft) both;
+  --animate-ambient: nx-ambient 9s ease-in-out infinite;
 }
 
 @keyframes nx-shimmer {
@@ -275,6 +277,27 @@ html.light[data-accent='amber'] {
   }
   50% {
     transform: scaleY(1);
+  }
+}
+
+@keyframes nx-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes nx-ambient {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.75;
   }
 }
 

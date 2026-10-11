@@ -141,7 +141,9 @@ export default function RoomLayout() {
           <Outlet />
         </div>
 
-        {!isMobile && panel ? <RoomPanel className="w-[340px] shrink-0 border-l border-line" /> : null}
+        {!isMobile && panel ? (
+          <RoomPanel className="w-[340px] shrink-0 animate-slide-in-right border-l border-line" />
+        ) : null}
       </div>
 
       <ControlBar />
