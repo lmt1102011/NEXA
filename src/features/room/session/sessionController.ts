@@ -1189,7 +1189,14 @@ export async function requestJoin(options: JoinOptions) {
   state.setSelf(self)
   state.setStatus('awaiting')
 
-  if (!room.settings.access.requireApproval || room.hostId === session.userId) {
+  // Public rooms are open to everyone: only private rooms put guests through
+  // the waiting room.
+  const skipApproval =
+    room.visibility === 'public' ||
+    !room.settings.access.requireApproval ||
+    room.hostId === session.userId
+
+  if (skipApproval) {
     await approveSelf()
     return
   }

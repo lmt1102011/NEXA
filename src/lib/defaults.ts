@@ -8,7 +8,7 @@ export function defaultRoomSettings(): RoomSettings {
       visibility: 'public',
     },
     access: {
-      requireApproval: true,
+      requireApproval: false,
       lockRoom: false,
       allowJoinByCode: true,
     },

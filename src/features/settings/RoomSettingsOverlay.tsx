@@ -140,12 +140,18 @@ export default function RoomSettingsOverlay() {
           </Section>
 
           <Section icon={<Shield className="h-3.5 w-3.5" />} title={t('Access')}>
-            <ToggleRow
-              label={t('Require approval')}
-              description={t('Guests wait in the waiting room until you accept.')}
-              checked={settings.access.requireApproval}
-              onCheckedChange={(checked) => applyHostSettings({ access: { requireApproval: checked } })}
-            />
+            {settings.general.visibility === 'public' ? (
+              <p className="py-3 text-[12.5px] leading-relaxed text-ink-subtle">
+                {t('Public rooms are open — anyone can join without approval.')}
+              </p>
+            ) : (
+              <ToggleRow
+                label={t('Require approval')}
+                description={t('Guests wait in the waiting room until you accept.')}
+                checked={settings.access.requireApproval}
+                onCheckedChange={(checked) => applyHostSettings({ access: { requireApproval: checked } })}
+              />
+            )}
             <ToggleRow
               label={t('Lock room')}
               description={t('Nobody new can request to join.')}

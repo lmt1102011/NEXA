@@ -97,6 +97,7 @@ export const screensVi: Record<string, TranslationEntry> = {
   Private: 'Riêng tư',
   Access: 'Truy cập',
   'Require approval': 'Yêu cầu duyệt khi tham gia',
+  'Public rooms are open — anyone can join without approval.': 'Phòng công khai luôn mở — ai cũng có thể vào mà không cần duyệt.',
   'Guests wait in the waiting room until you accept.': 'Khách sẽ chờ ở phòng chờ cho đến khi bạn chấp nhận.',
   'Lock room': 'Khóa phòng',
   'Nobody new can request to join.': 'Không ai mới có thể yêu cầu tham gia.',

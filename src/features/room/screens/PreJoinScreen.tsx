@@ -60,7 +60,8 @@ export default function PreJoinScreen() {
 
   if (!room) return null
 
-  const requireApproval = room.settings.access.requireApproval
+  // Public rooms let anyone in, so the pre-join screen never offers a request.
+  const requireApproval = room.visibility !== 'public' && room.settings.access.requireApproval
   const trimmed = name.trim()
   const emptyName = trimmed.length === 0
   const flaggedTaken =

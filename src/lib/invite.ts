@@ -17,7 +17,9 @@ export function buildInviteLink(room: Room): string {
   params.set('hostName', room.hostName)
   params.set('code', room.code)
   if (room.description) params.set('desc', room.description)
-  if (room.settings.access.requireApproval) params.set('approval', '1')
+  if (room.visibility !== 'public' && room.settings.access.requireApproval) {
+    params.set('approval', '1')
+  }
   params.set('max', String(room.settings.participants.maxParticipants))
   params.set('visibility', room.visibility)
   params.set('bg', room.settings.appearance.background)
@@ -37,7 +39,9 @@ export function roomFromInviteParams(roomId: string, search: URLSearchParams): R
   settings.general.name = name
   const description = search.get('desc')
   if (description) settings.general.description = description
-  settings.access.requireApproval = search.get('approval') === '1'
+  const visibility = search.get('visibility') === 'public' ? 'public' : 'private'
+  // Public rooms are always open, so an old link carrying approval=1 is ignored.
+  settings.access.requireApproval = visibility === 'public' ? false : search.get('approval') === '1'
   const max = Number(search.get('max'))
   if (Number.isFinite(max) && max > 0) settings.participants.maxParticipants = max
   const bg = search.get('bg')
@@ -51,7 +55,7 @@ export function roomFromInviteParams(roomId: string, search: URLSearchParams): R
     description: settings.general.description,
     hostId,
     hostName: search.get('hostName') ?? name,
-    visibility: search.get('visibility') === 'public' ? 'public' : 'private',
+    visibility,
     status: 'idle',
     createdAt: Date.now(),
     lastActiveAt: Date.now(),

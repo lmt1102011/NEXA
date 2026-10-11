@@ -28,7 +28,7 @@ export default function CreateRoomPage() {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [creating, setCreating] = useState(false)
 
-  const [requireApproval, setRequireApproval] = useState(true)
+  const [requireApproval, setRequireApproval] = useState(false)
   const [maxParticipants, setMaxParticipants] = useState(12)
   const [defaultMic, setDefaultMic] = useState(true)
   const [defaultCamera, setDefaultCamera] = useState(true)
@@ -168,13 +168,19 @@ export default function CreateRoomPage() {
                   transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="space-y-1 divide-y divide-[var(--nx-line)] px-2.5 pb-3 pt-1">
-                    <ToggleRow
-                      label={t('Require host approval')}
-                      description={t('Guests wait until you accept their request.')}
-                      checked={requireApproval}
-                      onCheckedChange={setRequireApproval}
-                    />
+                    <div className="space-y-1 divide-y divide-[var(--nx-line)] px-2.5 pb-3 pt-1">
+                      {visibility === 'public' ? (
+                        <p className="py-3.5 text-[12.5px] leading-relaxed text-ink-subtle">
+                          {t('Public rooms are open — anyone can join without approval.')}
+                        </p>
+                      ) : (
+                        <ToggleRow
+                          label={t('Require host approval')}
+                          description={t('Guests wait until you accept their request.')}
+                          checked={requireApproval}
+                          onCheckedChange={setRequireApproval}
+                        />
+                      )}
                     <ToggleRow
                       label={t('Default microphone')}
                       description={t('Microphone starts on when you enter.')}
