@@ -7,6 +7,7 @@ import { useCopy } from '@/hooks'
 import { Avatar } from '@/components/ui/avatar'
 import { IconSmile } from '@/components/ui/icons'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ReactionBar } from '@/components/ui/reaction-bar'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useRoomSessionStore } from '@/stores/roomSession'
 import {
@@ -18,9 +19,8 @@ import {
   sendTyping,
   toggleReaction,
 } from '@/features/room/session/sessionController'
+import { REACTION_EMOJIS } from '@/lib/reactions'
 import type { ChatMessage } from '@/types'
-
-const QUICK_EMOJI = ['👍', '❤️', '😂', '🎉', '👀', '🔥']
 
 function formatTime(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -640,20 +640,23 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
           {allowReactions && !isDeleted ? (
             <>
               {reactionEntries.map(([emoji, users]) => (
-                <button
+                <motion.button
                   key={emoji}
                   type="button"
                   onClick={() => toggleReaction(message.id, emoji)}
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 520, damping: 22 }}
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11.5px] transition-colors',
+                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11.5px] transition-colors',
                     mineActive(emoji)
                       ? 'border-accent/50 bg-accent-soft text-accent'
                       : 'border-line bg-surface-2 text-ink-muted hover:border-line-strong',
                   )}
                 >
-                  <span>{emoji}</span>
+                  <span className="text-[14px] leading-none">{emoji}</span>
                   <span className="font-mono">{users.length}</span>
-                </button>
+                </motion.button>
               ))}
 
               <Popover>
@@ -666,17 +669,8 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
                     <IconSmile className="h-3.5 w-3.5" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align={own ? 'end' : 'start'} className="flex gap-1 p-1.5">
-                  {QUICK_EMOJI.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => toggleReaction(message.id, emoji)}
-                      className="grid h-8 w-8 place-items-center rounded-lg text-[16px] transition-colors hover:bg-surface-3"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+                <PopoverContent align={own ? 'end' : 'start'} className="w-auto rounded-full px-2 py-1.5 shadow-xl">
+                  <ReactionBar emojis={REACTION_EMOJIS} size="sm" onPick={(emoji) => toggleReaction(message.id, emoji)} />
                 </PopoverContent>
               </Popover>
             </>

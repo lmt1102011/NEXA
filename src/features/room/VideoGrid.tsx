@@ -4,7 +4,6 @@ import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { useBreakpoint, useMediaQuery } from '@/hooks'
 import { Avatar } from '@/components/ui/avatar'
-import { useUiStore } from '@/stores/ui'
 import { VideoTile } from '@/features/room/VideoTile'
 import type { Participant } from '@/types'
 
@@ -40,8 +39,6 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
   const { isMobile, isDesktop } = useBreakpoint()
   const landscape = useMediaQuery('(orientation: landscape)')
   const [expanded, setExpanded] = useState(false)
-  const spotlightId = useUiStore((state) => state.spotlightId)
-  const setSpotlight = useUiStore((state) => state.setSpotlight)
 
   const ordered = useMemo(() => {
     const self = participants.filter((participant) => participant.isSelf)
@@ -54,18 +51,6 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
     const rest = others.filter((participant) => !participant.handRaised)
     return [...raised, ...rest, ...self]
   }, [participants])
-
-  const spotlight = spotlightId ? ordered.find((participant) => participant.id === spotlightId) : undefined
-
-  if (spotlight) {
-    return (
-      <SpotlightLayout
-        spotlight={spotlight}
-        others={ordered.filter((participant) => participant.id !== spotlight.id)}
-        onUnpin={() => setSpotlight(null)}
-      />
-    )
-  }
 
   const hiddenCount = Math.max(0, ordered.length - MAX_VISIBLE_TILES)
   const visible = hiddenCount > 0 ? ordered.slice(0, MAX_VISIBLE_TILES - 1) : ordered
@@ -88,6 +73,7 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
             <VideoTile
               key={participant.id}
               participant={participant}
+              index={index}
               className={span ? 'col-span-2' : undefined}
             />
           )
@@ -113,42 +99,6 @@ export function VideoGrid({ participants }: { participants: Participant[] }) {
 
       {expanded ? (
         <ParticipantsOverlay participants={ordered} onClose={() => setExpanded(false)} />
-      ) : null}
-    </div>
-  )
-}
-
-function SpotlightLayout({
-  spotlight,
-  others,
-  onUnpin,
-}: {
-  spotlight: Participant
-  others: Participant[]
-  onUnpin: () => void
-}) {
-  const t = useT()
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-2 p-2 sm:gap-3 sm:p-3">
-      <div className="relative min-h-0 flex-1">
-        <VideoTile participant={spotlight} className="h-full" />
-        <button
-          type="button"
-          aria-label={t('Exit spotlight')}
-          onClick={onUnpin}
-          className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-lg bg-black/50 text-white/90 backdrop-blur transition-colors hover:bg-black/70 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      {others.length > 0 ? (
-        <div className="flex h-[84px] shrink-0 gap-2 overflow-x-auto nx-scroll sm:h-[120px] sm:gap-3">
-          {others.map((participant) => (
-            <div key={participant.id} className="h-full w-[128px] shrink-0 sm:w-[180px]">
-              <VideoTile participant={participant} compact className="h-full" />
-            </div>
-          ))}
-        </div>
       ) : null}
     </div>
   )

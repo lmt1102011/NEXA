@@ -15,8 +15,10 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ReactionBar } from '@/components/ui/reaction-bar'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
+import { REACTION_EMOJIS } from '@/lib/reactions'
 import { useBreakpoint } from '@/hooks'
 import { useCallStore } from '@/stores/call'
 import { useRoomSessionStore } from '@/stores/roomSession'
@@ -127,7 +129,7 @@ function MobileControl({ item }: { item: ControlItem }) {
   )
 }
 
-const FLOATING_EMOJIS = ['👍', '👏', '❤️', '😂', '🎉', '😮', '🔥', '🙌']
+const FLOATING_EMOJIS = REACTION_EMOJIS
 
 function ReactionPicker({ mobile = false }: { mobile?: boolean }) {
   const t = useT()
@@ -150,23 +152,14 @@ function ReactionPicker({ mobile = false }: { mobile?: boolean }) {
           {mobile ? null : <span className="hidden lg:inline">{t('React')}</span>}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-2">
-        <div className="grid grid-cols-4 gap-1">
-          {FLOATING_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              aria-label={emoji}
-              className="grid h-9 w-9 place-items-center rounded-lg text-xl transition-transform hover:scale-125 hover:bg-surface-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              onClick={() => {
-                sendFloatingReaction(emoji)
-                setOpen(false)
-              }}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
+      <PopoverContent className="w-auto rounded-full px-2 py-1.5 shadow-xl">
+        <ReactionBar
+          emojis={FLOATING_EMOJIS}
+          onPick={(emoji) => {
+            sendFloatingReaction(emoji)
+            setOpen(false)
+          }}
+        />
       </PopoverContent>
     </Popover>
   )

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useBreakpoint, useHotkeys } from '@/hooks'
@@ -131,7 +132,12 @@ export default function RoomLayout() {
   if (status !== 'joined') return <RoomStatusScreen />
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-bg">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      className="flex h-dvh flex-col overflow-hidden bg-bg"
+    >
       <RoomHeader />
       <NameConflictBar />
 
@@ -141,8 +147,21 @@ export default function RoomLayout() {
           <Outlet />
         </div>
 
-        {!isMobile && panel ? (
-          <RoomPanel className="w-[340px] shrink-0 animate-slide-in-right border-l border-line" />
+        {!isMobile ? (
+          <AnimatePresence initial={false}>
+            {panel ? (
+              <motion.div
+                key="room-panel"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 340, opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="shrink-0 overflow-hidden"
+              >
+                <RoomPanel className="h-full w-[340px] border-l border-line" />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         ) : null}
       </div>
 
@@ -174,6 +193,6 @@ export default function RoomLayout() {
           </SheetContent>
         </Sheet>
       ) : null}
-    </div>
+    </motion.div>
   )
 }
