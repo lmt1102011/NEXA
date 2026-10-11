@@ -77,6 +77,12 @@ export class TrysteroRealtimeService implements RealtimeService {
   private statsPrev: StatsBucket | null = null
   private senders: Partial<Record<EventType, (event: RoomEvent) => void>> = {}
   private pendingStream: MediaStream | null = null
+  private pendingStreamKind: 'camera' | 'screen' = 'camera'
+  private screenTrackIds = new Set<string>()
+  private appliedVideoSenders = new WeakSet<RTCRtpSender>()
+  private appliedAudioSenders = new WeakSet<RTCRtpSender>()
+  private lastVideoCap: { kbps: number | null; screen: number | null } | null = null
+  private lastAudioCap: number | null = null
 
   connect(roomId: ID, self: Participant) {
     if (this.room && this.roomId === roomId) {
@@ -120,7 +126,7 @@ export class TrysteroRealtimeService implements RealtimeService {
     room.onPeerLeave = (peerId) => this.handlePeerLeave(peerId)
     room.onPeerStream = (stream, peerId) => this.notifyStream(stream, peerId)
 
-    if (this.pendingStream) this.sendStream(this.pendingStream)
+    if (this.pendingStream) this.sendStream(this.pendingStream, this.pendingStreamKind)
   }
 
   private selfSnapshot(): Participant {
@@ -140,15 +146,22 @@ export class TrysteroRealtimeService implements RealtimeService {
     this.send('peer-update', { type: 'peer-update', participantId: self.id, patch: self })
   }
 
-  sendStream(stream: MediaStream | null) {
+  sendStream(stream: MediaStream | null, kind: 'camera' | 'screen' = 'camera') {
     if (!this.room) {
       this.pendingStream = stream
+      this.pendingStreamKind = kind
       return
     }
     this.pendingStream = null
 
     const nextTracks = new Set(stream?.getTracks() ?? [])
     if (stream === this.sentStream && sameTracks(nextTracks, this.sentTracks)) return
+
+    if (kind === 'screen' && stream) {
+      for (const track of stream.getVideoTracks()) this.screenTrackIds.add(track.id)
+    } else {
+      this.screenTrackIds.clear()
+    }
 
     // The MediaEngine keeps one long-lived MediaStream and swaps tracks in/out
     // (e.g. reapplyAudio replaces the mic track on the same stream object).
@@ -163,23 +176,48 @@ export class TrysteroRealtimeService implements RealtimeService {
     if (stream) {
       for (const promise of this.room.addStream(stream)) promise.catch(() => {})
     }
+    // A fresh stream means fresh senders: re-apply the current ceilings.
+    this.appliedVideoSenders = new WeakSet()
+    this.appliedAudioSenders = new WeakSet()
+    this.lastVideoCap = null
+    this.lastAudioCap = null
   }
 
   /**
-   * Caps the outbound camera bitrate on every live peer connection. WebRTC's
+   * Caps the outbound video bitrate on every live peer connection. WebRTC's
    * built-in congestion control still applies, but a lower ceiling keeps calls
-   * smooth (less buffering/loss) when the network is weak. Passing `null`
-   * removes the cap. Camera-only senders are left untouched.
+   * smooth (less buffering/loss) when the network is weak. Screen senders get
+   * their own, higher ceiling — a shared screen is mostly static content, so it
+   * benefits from more bits than a webcam.
+   *
+   * Senders that already carry the current ceiling are skipped: re-sending
+   * parameters every stats tick renegotiates the encoder for no benefit.
    */
-  setVideoMaxBitrate(kbps: number | null) {
+  setVideoMaxBitrate(kbps: number | null, screenKbps: number | null = null) {
     if (!this.room) return
+    const screen = screenKbps ?? kbps
+
+    const changed =
+      this.lastVideoCap === null ||
+      this.lastVideoCap.kbps !== kbps ||
+      this.lastVideoCap.screen !== screen
+    if (changed) {
+      this.appliedVideoSenders = new WeakSet()
+      this.lastVideoCap = { kbps, screen }
+    }
+
     for (const pc of Object.values(this.room.getPeers())) {
       for (const sender of pc.getSenders()) {
-        if (sender.track?.kind !== 'video' || sender.track.muted) continue
+        const track = sender.track
+        if (track?.kind !== 'video' || track.muted) continue
+        if (!changed && this.appliedVideoSenders.has(sender)) continue
+
+        const isScreen = this.screenTrackIds.has(track.id)
+        const cap = isScreen ? screen : kbps
         const params = sender.getParameters()
         const encodings = params.encodings?.map((enc) => ({
           ...enc,
-          maxBitrate: kbps === null ? 8_000_000 : kbps * 1000,
+          maxBitrate: cap === null ? undefined : cap * 1000,
         }))
         if (!encodings) continue
         const next: RTCRtpSendParameters = {
@@ -189,8 +227,9 @@ export class TrysteroRealtimeService implements RealtimeService {
         }
         try {
           void sender.setParameters(next).catch(() => undefined)
+          this.appliedVideoSenders.add(sender)
         } catch {
-          // parameters may be mid-negotiation; the next stats tick re-applies
+          // parameters may be mid-negotiation; a later change re-applies
         }
       }
     }
@@ -199,22 +238,32 @@ export class TrysteroRealtimeService implements RealtimeService {
   /**
    * Caps the outbound microphone bitrate on every live peer connection. Unlike
    * video this is set once per room setting change; audio has no adaptive
-   * controller. Passing `null` restores the (high) default ceiling.
+   * controller. Passing `null` leaves the browser default in place instead of
+   * inflating the ceiling — voice is transparent well under 100 kbps, and a
+   * huge ceiling only makes the encoder flood a shared uplink.
    */
   setAudioMaxBitrate(kbps: number | null) {
     if (!this.room) return
+    if (this.lastAudioCap === kbps) return
+    this.lastAudioCap = kbps
+    this.appliedAudioSenders = new WeakSet()
+
     for (const pc of Object.values(this.room.getPeers())) {
       for (const sender of pc.getSenders()) {
-        if (sender.track?.kind !== 'audio' || sender.track.muted) continue
+        const track = sender.track
+        if (track?.kind !== 'audio' || track.muted) continue
+        if (this.appliedAudioSenders.has(sender)) continue
+
         const params = sender.getParameters()
         const encodings = params.encodings?.map((enc) => ({
           ...enc,
-          maxBitrate: kbps === null ? 510_000 : kbps * 1000,
+          maxBitrate: kbps === null ? undefined : kbps * 1000,
         }))
         if (!encodings) continue
         const next: RTCRtpSendParameters = { ...params, encodings }
         try {
           void sender.setParameters(next).catch(() => undefined)
+          this.appliedAudioSenders.add(sender)
         } catch {
           // parameters may be mid-negotiation; the next change re-applies
         }

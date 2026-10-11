@@ -61,8 +61,8 @@ export interface RealtimeService {
   connect: (roomId: ID, self: Participant) => void
   announce: () => void
   updateSelf: (self: Participant) => void
-  sendStream: (stream: MediaStream | null) => void
-  setVideoMaxBitrate: (kbps: number | null) => void
+  sendStream: (stream: MediaStream | null, kind?: 'camera' | 'screen') => void
+  setVideoMaxBitrate: (kbps: number | null, screenKbps?: number | null) => void
   setAudioMaxBitrate: (kbps: number | null) => void
   measureStats: () => Promise<StatsSample | null>
   getPeerQuality: () => Map<string, ConnectionQuality>

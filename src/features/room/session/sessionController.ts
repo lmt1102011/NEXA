@@ -29,7 +29,7 @@ import { useRoomsStore } from '@/stores/rooms'
 import { useSessionStore } from '@/stores/session'
 import { toast, useUiStore } from '@/stores/ui'
 
-const STATS_INTERVAL_MS = 3000
+const STATS_INTERVAL_MS = 2500
 const MAX_FILE_SIZE = 16 * 1024 * 1024
 /**
  * The wire (Trystero) transparently chunks large action payloads, so files no
@@ -69,7 +69,23 @@ const VIDEO_CAP_KBPS: Record<'poor' | 'fair' | 'good' | 'excellent', number | nu
   good: 1100,
   excellent: null,
 }
+/**
+ * A mesh fan-out multiplies every upload: with N remote peers each camera is
+ * encoded N times. Once a room turns into a group call the per-peer ceiling
+ * drops so the total stays inside a normal home uplink.
+ */
+const GROUP_PEERS_FROM = 3
+const VIDEO_CAP_KBPS_GROUP: Record<'poor' | 'fair' | 'good' | 'excellent', number | null> = {
+  poor: 220,
+  fair: 400,
+  good: 720,
+  excellent: 1300,
+}
 const LOW_BANDWIDTH_CAP_KBPS = 240
+
+/** Ceilings for a shared screen, which is mostly static content. */
+const SCREEN_CAP_KBPS = 2200
+const SCREEN_CAP_KBPS_GROUP = 1400
 
 /**
  * Room-level outbound ceilings chosen in room settings. They act as a hard
@@ -83,9 +99,13 @@ const VIDEO_QUALITY_CAP_KBPS: Record<VideoQuality, number | null> = {
   '360p': 700,
   '180p': 250,
 }
+/**
+ * Voice is transparent far below the Opus default ceiling, and a huge ceiling
+ * only makes an encoder flood a shared uplink, so every level is a real number.
+ */
 const AUDIO_QUALITY_CAP_KBPS: Record<AudioQuality, number | null> = {
-  auto: null,
-  high: null,
+  auto: 48,
+  high: 96,
   medium: 64,
   low: 32,
 }
@@ -104,6 +124,7 @@ let snapshotSentTo = new Set<ID>()
 let activeRoomId: ID | null = null
 let joinApproved = false
 let requestRetryTimer: number | null = null
+let pendingJoinRequest: JoinRequest | null = null
 let reconnectTimer: number | null = null
 let expireTimer: number | null = null
 let remotePeerSeen = false
@@ -266,6 +287,11 @@ function cleanupTransport() {
   offRealtime = null
   offRemoteStream?.()
   offRemoteStream = null
+  if (requestRetryTimer !== null) {
+    window.clearInterval(requestRetryTimer)
+    requestRetryTimer = null
+  }
+  pendingJoinRequest = null
   stopStatsMonitor()
   videoCap = null
   snapshotSentTo.clear()
@@ -321,14 +347,21 @@ function handleRemoteStream(stream: MediaStream | null, peerId: string) {
 
 function pushOutgoingStream() {
   const call = useCallStore.getState()
-  const stream = call.sharing ? mediaEngine.getScreenStream() : mediaEngine.getStream()
-  realtime?.sendStream(stream)
+  const sharing = call.sharing
+  const stream = sharing ? mediaEngine.getScreenStream() : mediaEngine.getStream()
+  realtime?.sendStream(stream, sharing ? 'screen' : 'camera')
+}
+
+/** A group call multiplies every outbound stream, so ceilings are tighter. */
+function isGroupCall() {
+  return store().participants.filter((participant) => !participant.isSelf).length >= GROUP_PEERS_FROM
 }
 
 function adaptVideoCap() {
   const call = useCallStore.getState()
   const quality = qualityController.getStats().quality
-  const base = call.lowBandwidth ? LOW_BANDWIDTH_CAP_KBPS : VIDEO_CAP_KBPS[quality]
+  const table = isGroupCall() ? VIDEO_CAP_KBPS_GROUP : VIDEO_CAP_KBPS
+  const base = call.lowBandwidth ? LOW_BANDWIDTH_CAP_KBPS : table[quality]
   const current = videoCap
   let next: number | null
 
@@ -340,14 +373,16 @@ function adaptVideoCap() {
     next = base
   } else if (base === 1100 && current >= 1100) {
     next = current
+  } else if (base === 720 && current >= 720) {
+    next = current
   } else {
     // recovered quality: raise in gentle steps to avoid oscillation
     next = Math.min(base, Math.round(current * 1.35))
   }
 
   videoCap = next
-  // Re-apply even when unchanged so peers that joined since the last tick also
-  // receive the current ceiling.
+  // Re-apply so peers that joined since the last tick also receive the current
+  // ceiling (senders that already carry it are skipped cheaply).
   applyVideoBitrate()
 }
 
@@ -356,7 +391,12 @@ function applyVideoBitrate() {
   if (!realtime) return
   const roomCap = VIDEO_QUALITY_CAP_KBPS[store().room?.settings.av.videoQuality ?? 'auto']
   const effective = roomCap === null ? videoCap : videoCap === null ? roomCap : Math.min(videoCap, roomCap)
-  realtime.setVideoMaxBitrate(effective)
+  // A shared screen keeps its own, higher ceiling, still bounded by whatever
+  // the connection and the room setting allow.
+  const screenBase = isGroupCall() ? SCREEN_CAP_KBPS_GROUP : SCREEN_CAP_KBPS
+  const limits = [screenBase, roomCap, videoCap].filter((value): value is number => value !== null)
+  const screenCap = limits.length > 0 ? Math.min(...limits) : null
+  realtime.setVideoMaxBitrate(effective, screenCap)
 }
 
 /** Pushes the room's audio/video quality ceilings to the live peer connections. */
@@ -825,6 +865,8 @@ function handleRealtimeEvent(event: RoomEvent) {
       touchParticipant(event.participant.id)
       state.addParticipant(sanitizeParticipant(event.participant))
       if (isAuthenticatedHost()) sendSnapshot(event.participant.id)
+      // A link to this peer now exists: the fastest moment to land our request.
+      flushPendingJoinRequest()
       if (state.self?.role === 'host') {
         const clash = nameTakenBy(event.participant.name, event.participant.id)
         if (clash) flagNameClash(clash, event.participant.id)
@@ -836,6 +878,7 @@ function handleRealtimeEvent(event: RoomEvent) {
       touchParticipant(event.participant.id)
       state.addParticipant(sanitizeParticipant(event.participant))
       if (isAuthenticatedHost()) sendSnapshot(event.participant.id)
+      flushPendingJoinRequest()
       if (state.self?.role === 'host') {
         const clash = nameTakenBy(event.participant.name, event.participant.id)
         if (clash) flagNameClash(clash, event.participant.id)
@@ -1211,28 +1254,44 @@ export async function requestJoin(options: JoinOptions) {
     micOn: call.micOn,
     cameraOn: call.cameraOn,
   }
+  pendingJoinRequest = request
   realtime?.emit({ type: 'request', request })
 
-  // Re-send the join request until the host resolves it. The first send can
-  // race with peer discovery (no direct link to the host yet), so the request
-  // is echoed a few times instead of being lost silently.
+  // The first send can race with peer discovery: the guest may not have a direct
+  // link to the host yet. The same request is echoed again the moment any peer
+  // answers (peer-hello/peer-ack below) and on a short timer as a backstop — the
+  // payload is a few hundred bytes, so this costs no meaningful bandwidth.
   if (requestRetryTimer !== null) window.clearInterval(requestRetryTimer)
   requestRetryTimer = window.setInterval(() => {
-    if (store().status !== 'awaiting' || !realtime) {
+    if (store().status !== 'awaiting' || !realtime || !pendingJoinRequest) {
       if (requestRetryTimer !== null) {
         window.clearInterval(requestRetryTimer)
         requestRetryTimer = null
       }
       return
     }
-    realtime.emit({ type: 'request', request })
-  }, 6000)
+    realtime.emit({ type: 'request', request: pendingJoinRequest })
+  }, 2000)
+}
+
+/** Re-sends a pending join request the instant a link to the host appears. */
+function flushPendingJoinRequest() {
+  const request = pendingJoinRequest
+  if (!request || store().status !== 'awaiting' || !realtime) return
+  realtime.emit({ type: 'request', request })
 }
 
 async function approveSelf() {
   const state = store()
   if (state.status !== 'awaiting' || joinApproved) return
   joinApproved = true
+
+  // The wait is over: stop echoing the join request.
+  pendingJoinRequest = null
+  if (requestRetryTimer !== null) {
+    window.clearInterval(requestRetryTimer)
+    requestRetryTimer = null
+  }
 
   state.join()
   connectAsSelf()

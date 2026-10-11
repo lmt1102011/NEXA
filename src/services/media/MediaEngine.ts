@@ -135,6 +135,22 @@ export class MediaEngine {
       if (!existingIds.has(track.id)) existing.addTrack(track)
     }
     this.stream = existing
+    this.applyContentHints(incoming)
+  }
+
+  /**
+   * Tells the encoder what matters for each track: faces and motion keep a
+   * steady frame rate, so a webcam asks for `motion` and Chrome trades
+   * resolution before it drops frames. A shared screen asks the opposite.
+   */
+  private applyContentHints(incoming: MediaStream) {
+    for (const track of incoming.getVideoTracks()) {
+      try {
+        track.contentHint = this.screenStream ? 'detail' : 'motion'
+      } catch {
+        // older browsers without contentHint
+      }
+    }
   }
 
   /**
@@ -340,6 +356,12 @@ export class MediaEngine {
       })
       this.screenStream = stream
       const [track] = stream.getVideoTracks()
+      // Static content: let the encoder trade frames for sharp text.
+      try {
+        track.contentHint = 'detail'
+      } catch {
+        // older browsers without contentHint
+      }
       track.addEventListener('ended', () => this.stopScreenShare())
       this.notifyStream()
       return true
@@ -352,6 +374,13 @@ export class MediaEngine {
     if (!this.screenStream) return
     for (const track of this.screenStream.getTracks()) track.stop()
     this.screenStream = null
+    for (const track of this.stream?.getVideoTracks() ?? []) {
+      try {
+        track.contentHint = 'motion'
+      } catch {
+        // older browsers without contentHint
+      }
+    }
     this.notifyStream()
   }
 

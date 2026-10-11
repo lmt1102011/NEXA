@@ -58,10 +58,15 @@ function smoother(from: number, to: number, amount: number): number {
   return from + (to - from) * amount
 }
 
+/**
+ * Congestion is caught a little earlier than "the call already looks bad":
+ * encoder back-pressure shows up as loss/jitter long before it is audible or
+ * visible, and reacting then is what keeps the call smooth.
+ */
 function classify(ping: number, jitter: number, loss: number): ConnectionQuality {
-  if (loss >= 6 || ping >= 220 || jitter >= 30) return 'poor'
-  if (loss >= 2.5 || ping >= 140 || jitter >= 18) return 'fair'
-  if (loss >= 1 || ping >= 90 || jitter >= 10) return 'good'
+  if (loss >= 4 || ping >= 200 || jitter >= 26) return 'poor'
+  if (loss >= 1.6 || ping >= 130 || jitter >= 15) return 'fair'
+  if (loss >= 0.6 || ping >= 80 || jitter >= 8) return 'good'
   return 'excellent'
 }
 
