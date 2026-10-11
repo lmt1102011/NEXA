@@ -155,9 +155,6 @@ export const commonVi: Record<string, TranslationEntry> = {
   Pin: 'Ghim',
   Unpin: 'Bỏ ghim',
 
-  // ---- picture in picture ----
-  'Picture in picture': 'Hình trong hình',
-
   // ---- chat notifications ----
   'Sent a file': 'Đã gửi một tệp',
 
