@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { Check, ClipboardCopy, Download, FileText, Paperclip, Pencil, Pin, Reply, Search, SendHorizontal, SmilePlus, Trash2, X } from 'lucide-react'
+import { Check, ClipboardCopy, Download, FileText, Paperclip, Pencil, Pin, Reply, SendHorizontal, SmilePlus, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { useCopy } from '@/hooks'
@@ -197,20 +197,6 @@ export function ChatPanel() {
           ) : null}
         </div>
       ) : null}
-
-      <div className="shrink-0 border-b border-line px-3 py-2">
-        <div className="flex items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2">
-          <Search className="h-3.5 w-3.5 shrink-0 text-ink-subtle" />
-          <input
-            value={''}
-            onChange={() => {}}
-            placeholder={t('Search messages…')}
-            aria-label={t('Search messages')}
-            disabled
-            className="h-7 w-full bg-transparent text-[12.5px] text-ink-subtle placeholder:text-ink-subtle"
-          />
-        </div>
-      </div>
 
       <div ref={listRef} onScroll={handleScroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto nx-scroll px-3 py-3.5">
         {visibleMessages.length === 0 ? (
