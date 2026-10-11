@@ -362,6 +362,24 @@ export class TrysteroRealtimeService implements RealtimeService {
     return result
   }
 
+  /**
+   * Asks one peer connection to re-do ICE. A half-open link (NAT binding
+   * expired, network switched Wi-Fi → LTE) shows up as a dropped media flow
+   * while the peer itself is still there, so rebuilding just that path is far
+   * cheaper than tearing down the whole signaling session.
+   */
+  restartIce(participantId: ID) {
+    if (!this.room) return
+    const peerId = this.peerByParticipant.get(participantId)
+    if (!peerId) return
+    const pc = this.room.getPeers()[peerId]
+    try {
+      pc?.restartIce?.()
+    } catch {
+      // restartIce is not universally supported; the caller retries otherwise
+    }
+  }
+
   disconnect() {
     this.room?.leave().catch(() => {})
     this.room = null

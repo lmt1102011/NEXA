@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Lock, Search, SearchX } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Lock, Search, SearchX, TicketPercent } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -8,6 +8,7 @@ import { Segmented } from '@/components/ui/segmented'
 import { useT } from '@/lib/i18n'
 import { useRoomsStore } from '@/stores/rooms'
 import { usePublicRooms } from '@/features/rooms/usePublicRooms'
+import { findRoomByCode, normalizeCode } from '@/features/rooms/joinByCode'
 import { RoomCard, RoomCardSkeleton } from '@/features/rooms/RoomCard'
 import type { Room } from '@/types'
 
@@ -18,7 +19,10 @@ export default function RoomsPage() {
   const localRooms = useRoomsStore((state) => state.rooms)
   const rooms = usePublicRooms()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState('')
+  const [code, setCode] = useState('')
+  const [codeError, setCodeError] = useState<string | null>(null)
   const [sort, setSort] = useState<SortKey>('live')
   const [loading, setLoading] = useState(true)
 
@@ -32,6 +36,41 @@ export default function RoomsPage() {
     const timer = window.setTimeout(() => setLoading(false), 520)
     return () => window.clearTimeout(timer)
   }, [])
+
+  // A code handed over from the home page (?code=ABC123) resolves on arrival.
+  useEffect(() => {
+    const incoming = searchParams.get('code')
+    if (!incoming) return
+    setCode(incoming.toUpperCase())
+    if (findRoomByCode(incoming)) {
+      setCodeError(null)
+      navigate(`/room/${findRoomByCode(incoming)!.id}`)
+    } else {
+      setCodeError(
+        t('No room matches the code “{code}”. Check it, or use the invite link for a private room.', {
+          code: incoming.toUpperCase(),
+        }),
+      )
+    }
+    setSearchParams({}, { replace: true })
+  }, [searchParams, t, setSearchParams, navigate])
+
+  function handleCodeSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    const trimmed = code.trim()
+    if (!trimmed) return
+    const found = findRoomByCode(trimmed)
+    if (!found) {
+      setCodeError(
+        t('No room matches the code “{code}”. Check it, or use the invite link for a private room.', {
+          code: normalizeCode(trimmed),
+        }),
+      )
+      return
+    }
+    setCodeError(null)
+    navigate(`/room/${found.id}`)
+  }
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -80,6 +119,50 @@ export default function RoomsPage() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <form
+          onSubmit={handleCodeSubmit}
+          className="flex w-full items-center gap-2 sm:max-w-sm"
+          aria-label={t('Join with a room code')}
+        >
+          <div className="relative w-full">
+            <TicketPercent className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
+            <Input
+              value={code}
+              onChange={(event) => {
+                setCode(event.target.value.toUpperCase())
+                setCodeError(null)
+              }}
+              placeholder={t('Room code')}
+              aria-label={t('Join with a room code')}
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={12}
+              className="pl-10 font-mono tracking-[0.2em] uppercase"
+            />
+          </div>
+          <Button type="submit" size="md" disabled={!code.trim()}>
+            {t('Join')}
+          </Button>
+        </form>
+        <div className="w-full overflow-x-auto pb-1 sm:w-auto sm:pb-0">
+          <Segmented
+            ariaLabel={t('Sort rooms')}
+            value={sort}
+            onChange={setSort}
+            options={SORT_OPTIONS}
+            className="min-w-max sm:min-w-[300px]"
+            size="sm"
+          />
+        </div>
+      </div>
+
+      {codeError ? (
+        <p role="alert" className="mt-3 text-[12.5px] text-danger">
+          {codeError}
+        </p>
+      ) : null}
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
           <Input

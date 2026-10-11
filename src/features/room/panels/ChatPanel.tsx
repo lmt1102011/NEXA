@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { Check, ClipboardCopy, Download, FileText, Paperclip, Pencil, Pin, Reply, SendHorizontal, SmilePlus, Trash2, X } from 'lucide-react'
+import { Check, ClipboardCopy, Download, ExternalLink, FileText, Paperclip, Pencil, Pin, Reply, SendHorizontal, SmilePlus, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useT } from '@/lib/i18n'
 import { useCopy } from '@/hooks'
@@ -72,6 +72,62 @@ function renderMentionText(text: string, names: string[], selfName: string) {
     last = match.index + match[0].length
   }
   if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+/**
+ * Matches everything that looks like a web link. Trailing punctuation is left
+ * out so "xem https://… nhé." keeps its period outside the link.
+ */
+const URL_PATTERN = /https?:\/\/[^\s<>"'`]+[^\s<>"'`.,!?:;)\]]/giu
+
+/** Trimmed-down form of a link for display: no scheme, no `www.`, capped length. */
+function shortenUrl(url: string) {
+  const trimmed = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '')
+  return trimmed.length > 52 ? `${trimmed.slice(0, 51)}…` : trimmed
+}
+
+/**
+ * Renders message text: URLs become tappable links, everything else keeps the
+ * `@Name` highlighting. Only http/https links are linked, so a pasted
+ * `javascript:` URL stays inert text.
+ */
+function renderMessageText(text: string, names: string[], selfName: string) {
+  const urls = text.match(URL_PATTERN)
+  if (!urls) return renderMentionText(text, names, selfName)
+
+  const nodes: ReactNode[] = []
+  let cursor = 0
+  for (const url of urls) {
+    const index = text.indexOf(url, cursor)
+    if (index < 0) continue
+    if (index > cursor) {
+      nodes.push(
+        <span key={`text-${cursor}`}>
+          {renderMentionText(text.slice(cursor, index), names, selfName)}
+        </span>,
+      )
+    }
+    nodes.push(
+      <a
+        key={`url-${index}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        className="inline-flex items-center gap-1 font-medium text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:decoration-accent"
+      >
+        {shortenUrl(url)}
+        <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+      </a>,
+    )
+    cursor = index + url.length
+  }
+  if (cursor < text.length) {
+    nodes.push(
+      <span key="text-tail">{renderMentionText(text.slice(cursor), names, selfName)}</span>,
+    )
+  }
   return nodes
 }
 
@@ -573,7 +629,7 @@ function ChatRow({ message, onReply }: { message: ChatMessage; onReply?: (messag
                 </a>
               ) : (
                 <span className="whitespace-pre-wrap break-words select-text">
-                  {renderMentionText(message.text, mentionNames, self?.name ?? '')}
+                  {renderMessageText(message.text, mentionNames, self?.name ?? '')}
                 </span>
               )}
             </>

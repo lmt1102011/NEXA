@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
-import { ArrowRight, Radio, Search, Users } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, Radio, Search, TicketPercent, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LiveDot } from '@/components/ui/badge'
@@ -17,8 +17,10 @@ const heroMotion = {
 
 export default function HomePage() {
   const t = useT()
+  const navigate = useNavigate()
   const rooms = usePublicRooms()
   const [query, setQuery] = useState('')
+  const [code, setCode] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -119,6 +121,35 @@ export default function HomePage() {
                 </Button>
               </Link>
             </motion.div>
+
+            <motion.form
+              variants={heroMotion}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              onSubmit={(event) => {
+                event.preventDefault()
+                const value = code.trim()
+                if (value.length >= 4) navigate(`/rooms?code=${encodeURIComponent(value.toUpperCase())}`)
+              }}
+              aria-label={t('Join with a room code')}
+              className="mx-auto mt-5 flex w-full max-w-xs items-center gap-2"
+            >
+              <div className="relative w-full">
+                <TicketPercent className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
+                <Input
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.toUpperCase())}
+                  placeholder={t('Room code')}
+                  aria-label={t('Join with a room code')}
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  maxLength={12}
+                  className="pl-10 font-mono tracking-[0.2em] uppercase"
+                />
+              </div>
+              <Button type="submit" size="md" disabled={code.trim().length < 4}>
+                {t('Join')}
+              </Button>
+            </motion.form>
 
             <motion.p
               variants={heroMotion}

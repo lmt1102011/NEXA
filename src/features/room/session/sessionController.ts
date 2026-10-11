@@ -126,11 +126,15 @@ let joinApproved = false
 let requestRetryTimer: number | null = null
 let pendingJoinRequest: JoinRequest | null = null
 let reconnectTimer: number | null = null
+/** Removes the network/visibility listeners bound by the reconnect monitor. */
+let reconnectCleanup: (() => void) | null = null
 let expireTimer: number | null = null
 let remotePeerSeen = false
 let droppedPeersBySilence = false
 let reconnectAttempts = 0
 let hardReconnects = 0
+/** Peer links an ICE restart has already been attempted for this session. */
+let iceRestartTried = new Set<ID>()
 let lastTypingSent = 0
 let typingActive = false
 const typingTimers = new Map<ID, number>()
@@ -498,6 +502,8 @@ function applyPeerQuality() {
  */
 function touchParticipant(participantId: ID) {
   lastSeen.set(participantId, Date.now())
+  // Heard from them again: a future stall may be retried with a fresh ICE.
+  if (iceRestartTried.size > 0) iceRestartTried.delete(participantId)
 }
 
 function evictSilentPeers() {
@@ -570,18 +576,68 @@ function maybeReconnect() {
   }
 }
 
+/**
+ * A single half-open peer link is far more common than a dead session: the NAT
+ * binding or the phone's network changed while the peer stayed put. Tickle
+ * those links with an ICE restart before the silence timeout evicts anyone.
+ */
+function restartStalledPeers() {
+  if (!joinApproved || document.hidden) return
+  const state = store()
+  const known = state.participants.filter((participant) => !participant.isSelf)
+  if (known.length === 0) return
+
+  const now = Date.now()
+  for (const participant of known) {
+    const seen = lastSeen.get(participant.id)
+    if (seen === undefined || now - seen < STALE_EVICT_MS / 2) continue
+    if (iceRestartTried.has(participant.id)) continue
+    iceRestartTried.add(participant.id)
+    realtime?.restartIce(participant.id)
+  }
+}
+
 function startReconnectMonitor() {
   if (reconnectTimer !== null) return
-  reconnectTimer = window.setInterval(maybeReconnect, RECONNECT_INTERVAL_MS)
+  reconnectTimer = window.setInterval(() => {
+    restartStalledPeers()
+    maybeReconnect()
+  }, RECONNECT_INTERVAL_MS)
+
+  // A device that regains connectivity (Wi-Fi back, laptop woke up) shouldn't
+  // wait for the next polling tick to try again.
+  const onNetworkBack = () => {
+    hardReconnects = 0
+    reconnectAttempts = 0
+    if (document.visibilityState === 'visible') {
+      restartStalledPeers()
+      maybeReconnect()
+    }
+  }
+  const onVisible = () => {
+    if (document.hidden) return
+    hardReconnects = 0
+    restartStalledPeers()
+    maybeReconnect()
+  }
+  window.addEventListener('online', onNetworkBack)
+  document.addEventListener('visibilitychange', onVisible)
+  reconnectCleanup = () => {
+    window.removeEventListener('online', onNetworkBack)
+    document.removeEventListener('visibilitychange', onVisible)
+    reconnectCleanup = null
+  }
 }
 
 function stopReconnectMonitor() {
   if (reconnectTimer !== null) window.clearInterval(reconnectTimer)
   reconnectTimer = null
+  reconnectCleanup?.()
   remotePeerSeen = false
   droppedPeersBySilence = false
   reconnectAttempts = 0
   hardReconnects = 0
+  iceRestartTried.clear()
 }
 
 function startPresenceMonitor() {

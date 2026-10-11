@@ -66,6 +66,8 @@ export interface RealtimeService {
   setAudioMaxBitrate: (kbps: number | null) => void
   measureStats: () => Promise<StatsSample | null>
   getPeerQuality: () => Map<string, ConnectionQuality>
+  /** Re-runs ICE on a single peer connection (half-open link recovery). */
+  restartIce: (participantId: ID) => void
   disconnect: () => void
   forcePeerLeave: (participantId: ID) => void
   emit: (event: RoomEvent) => void

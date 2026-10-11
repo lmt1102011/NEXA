@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Mic, MicOff, MoreVertical, Trash, VideoOff, VolumeX, Volume1, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -35,6 +35,8 @@ export const VideoTile = memo(function VideoTile({
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [inView, setInView] = useState(true)
   const t = useT()
   const isSelf = participant.isSelf
   const self = useRoomSessionStore((state) => state.self)
@@ -86,10 +88,37 @@ export const VideoTile = memo(function VideoTile({
     }
   }, [remoteStream, showRemoteVideo, volume, activeOutputId])
 
+  /**
+   * Scrolling a dense grid leaves tiles nobody is looking at still decoding
+   * video, which is pure CPU/battery burn on a phone. Tiles that scroll out of
+   * the viewport pause their picture element and resume instantly on return.
+   * Audio is never paused — someone off-screen is still talking.
+   */
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver((entries) => setInView(entries[entries.length - 1].isIntersecting), {
+      threshold: 0,
+    })
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const video = isSelf ? localVideoRef.current : remoteVideoRef.current
+    if (!video) return
+    if (inView) {
+      if (video.paused && video.readyState >= 2) void video.play().catch(() => undefined)
+      return
+    }
+    if (!video.paused) video.pause()
+  }, [inView, isSelf, showLocalVideo, showRemoteVideo, remoteStream])
+
   const hasLiveMedia = showLocalVideo || showRemoteVideo
 
   return (
     <motion.div
+      ref={rootRef}
       layout
       initial={{ opacity: 0, scale: 0.98, y: 6 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -73,6 +73,10 @@ export const lobbyVi: Record<string, TranslationEntry> = {
   'Browse live rooms, or search by room name and code.':
     'Xem các phòng đang diễn ra, hoặc tìm theo tên phòng và mã phòng.',
   'Sort rooms': 'Sắp xếp phòng',
+  'Join with a room code': 'Vào phòng bằng mã phòng',
+  'Room code': 'Mã phòng',
+  'No room matches the code “{code}”. Check it, or use the invite link for a private room.':
+    'Không có phòng nào khớp với mã “{code}”. Hãy kiểm tra lại, hoặc dùng link mời nếu là phòng riêng tư.',
   'Found by code': 'Tìm thấy theo mã',
   'No rooms found': 'Không tìm thấy phòng nào',
   'Nothing matches “{query}”. Try a different name or room code.':
